@@ -1,4 +1,4 @@
-# Piecewise-Linear geometric extreme value inference
+# Piecewise-linear geometric modelling of multivariate extremes
 
 ## Installation
 ``` r
