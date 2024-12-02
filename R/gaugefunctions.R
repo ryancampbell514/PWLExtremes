@@ -149,6 +149,8 @@ gauge_logistic_lap = function(vec,dep.par){
 ##########################################################################
 
 gauss.alog.mixgauge = function(xyz,par){
+  require(geometricMVE)
+  
   # gauge for d=3 simulation study
   # par -> length 5
   if(length(par) != 5){
