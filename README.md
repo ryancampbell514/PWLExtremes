@@ -2,7 +2,7 @@
 
 ## Dependencies
 
-Please install the geometricMVE package by dowloading the .tar.gz file [using this link](https://www.lancaster.ac.uk/~wadswojl/geometricMVE_0.1.6.tar.gz)
+Please install the geometricMVE package by dowloading the .tar.gz file [using this link](https://www.lancaster.ac.uk/~wadswojl/geometricMVE_0.1.6.tar.gz).
 
 All dependencies should be installed using
 ``` r
