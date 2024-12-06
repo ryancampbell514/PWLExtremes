@@ -230,7 +230,7 @@ f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
 #   }
 # }
 
-get_ref_angles = function(w, min.num = 30){
+get_ref_angles = function(w, min.num = 30, gauss.corr=F){
 
   dd = dim(w)[2]
 
@@ -268,6 +268,14 @@ get_ref_angles = function(w, min.num = 30){
     }
 
   }
+
+  if(gauss.corr){
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
+    par.locs = ifelse(par.locs<0,0,par.locs)
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
+
+  }
+
 
   return(par.locs)
 }
