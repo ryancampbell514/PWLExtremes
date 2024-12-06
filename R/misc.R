@@ -8,9 +8,9 @@
 which.adj.angles.2d = function(angles,locs,norm=NULL,marg="pos"){
   # w         -> a vector or 2-column matrix of angles in the d=1 unit simplex
   # locs      -> vector of length Nmesh, the reference angles in the d=1 unit simplex
-  
+
   n.pars = length(locs)
-  
+
   if(marg=="pos"){
     lst.val = lapply(angles,function(w){
       for(j in 1:(n.pars-1)){
@@ -60,7 +60,7 @@ G.vol.2d = function(gauge.pars,par.locs,marg="pos"){
 
                        g.pars.1 = gauge.pars[j]
                        g.pars.2 = ifelse(j+1>length(par.locs),gauge.pars[1],gauge.pars[j+1])
-                       
+
                        par.locs.1 = pol2cart.L1Rd(w=loc1)
                        par.locs.2 = pol2cart.L1Rd(w=loc2)
                        par.locs.1.x = par.locs.1[1,1]
@@ -80,18 +80,18 @@ G.vol.2d = function(gauge.pars,par.locs,marg="pos"){
 
 which.adj.angles = function(angles,locs){
   require(geometry)
-  
+
   # angles are d-dimensional
-  
+
   if("data.frame" %in% class(locs)){
     locs=as.matrix(locs)
   }
   if("data.frame" %in% class(angles)){
     angles=as.matrix(angles)
   }
-  
+
   num.cols = dim(locs)[2]
-  
+
   del.tri = geometry::delaunayn(p=locs[,-num.cols], output.options=TRUE)
   w.adj.angles = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
                           t=del.tri$tri,
@@ -107,7 +107,7 @@ which.adj.angles = function(angles,locs){
 
 G.vol = function(gauge.pars,par.locs){
   num.cols = dim(par.locs)[2]
-  
+
   # Method 2: coordinate geometry
   del.tri = geometry::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)
   nodes = del.tri$tri
@@ -124,26 +124,26 @@ G.vol = function(gauge.pars,par.locs){
 n.DT.region = function(which.adj.angles.res,locs){
   # which.adj.angles.res  -> output of which.adj.angles()
   # locs                  -> the reference angles in the d=2 unit simplex
-  
+
   all.regions = lapply(which.adj.angles.res, function(lst) sort(lst$loc.idx))
   idx.locs = unique(all.regions)
-  
+
   res = lapply(idx.locs,function(loc){
     freq = sum(sapply(which.adj.angles.res, function(lst) all(sort(lst$loc.idx) == loc)))
     return(list(reg = locs[loc,],  # the region is defined by these vertices
                 loc = loc,
                 freq=freq))        # there are this many angles in the region
   })
-  
+
   return(res)
 }
 
-# # Given d-collumn exceedance angles, get reference angles such that each has 
+# # Given d-collumn exceedance angles, get reference angles such that each has
 # # sufficient data to estmate
 # get.par.logs = function(data){
-# 
+#
 #   res
-#   
+#
 #   return(res)
 # }
 
@@ -162,12 +162,12 @@ f.mcmc.g.2d<-function(niter,nburn,theta,alpha,thin,g){
   while(it<=niter){
     w<-rbeta(1,alpha,alpha)
     xcan<-rexp(1)*c(w,1-w)/g(c(w,1-w),par=theta)
-    
+
     accn<-g(xy=x,par=theta)*dbeta(x[1]/(x[1]+x[2]),alpha,alpha)*(xcan[1]+xcan[2])^2
     accd<-g(xy=xcan,par=theta)*dbeta(xcan[1]/(xcan[1]+xcan[2]),alpha,alpha)*(x[1]+x[2])^2
-    
+
     if(runif(1)<accn/accd){x<-xcan}
-    
+
     draws[it,]<-x
     it<-it+1
   }
@@ -186,12 +186,12 @@ f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
   while(it<=niter){
     w<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
     xcan<-rexp(1)*w/g(w)
-    
+
     accn<-g(x)*LaplacesDemon::ddirichlet(x/sum(x),alpha)*(sum(xcan))^3
     accd<-g(xcan)*LaplacesDemon::ddirichlet(xcan/sum(xcan),alpha)*(sum(x))^3
-    
+
     if(runif(1)<accn/accd){x<-xcan}
-    
+
     draws[it,]<-x
     it<-it+1
   }
@@ -211,7 +211,7 @@ f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
 #   # w.pol[r==0] = 0
 #   return(list(r=r,w=w.pol))
 # }
-# 
+#
 # cos1 = function(q){
 #   q = q %% 4
 #   q[q>2] = q[q>2]-4
@@ -229,3 +229,45 @@ f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
 #     return(r*cbind(w1,w2))
 #   }
 # }
+
+get_ref_angles = function(w, min.num = 30){
+
+  dd = dim(w)[2]
+
+  # define par.locs
+  # load("parlocs.RData")
+  par.locs = expand.grid(replicate(dd-1, seq(0,1,by=0.2), simplify = FALSE))
+  par.locs = cbind(par.locs,1-apply(par.locs,1,sum))
+  par.locs[,dd] = round(par.locs[,dd],3)
+  par.locs = par.locs[par.locs[,dd]>=0,]
+  par.locs = data.frame(rbind(diag(dd),as.matrix(unname(par.locs))))
+  par.locs = as.matrix(unname(par.locs[!duplicated(par.locs),]))
+
+  numm = rep(0,nrow(par.locs))
+  while(any(numm < min.num)){
+
+    nlocs = dim(par.locs)[1]
+    which.adj.angles.res = which.adj.angles(w,par.locs)
+    numm = sapply(1:nlocs, function(loc.fix){
+      num = sum(sapply(which.adj.angles.res,function(lst){
+        locs = lst$loc.idx
+        return(loc.fix %in% locs)
+      }))
+      return(num)
+    })
+    # print(cbind(par.locs,numm))
+    # print(numm)
+    which.rm = numm < min.num & c(1:nrow(par.locs)) > dd
+    par.locs.new = par.locs[!which.rm,]
+    if(nrow(par.locs.new) == nrow(par.locs)){
+      ord = order(numm)
+      which.rm = ord[ord>dd][1]
+      par.locs = par.locs.new[-which.rm,]
+    } else {
+      par.locs = par.locs.new
+    }
+
+  }
+
+  return(par.locs)
+}
