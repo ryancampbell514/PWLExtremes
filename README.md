@@ -1,5 +1,7 @@
 # Piecewise-linear geometric modelling of multivariate extremes
 
+Code associated with [the preprint](https://arxiv.org/abs/2412.05195), by [Ryan Campbell](https://www.ryanstats.com/) and [Jennifer Wadsworth](https://www.lancaster.ac.uk/~wadswojl/#).
+
 ## Dependencies
 
 Please install the geometricMVE package by downloading the .tar.gz file [using this link](https://www.lancaster.ac.uk/~wadswojl/geometricMVE_0.1.6.tar.gz).
