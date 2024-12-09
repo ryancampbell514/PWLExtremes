@@ -1,6 +1,6 @@
 # Piecewise-linear geometric modelling of multivariate extremes
 
-Code associated with [the preprint](https://arxiv.org/abs/2412.05195), by [Ryan Campbell](https://www.ryanstats.com/) and [Jennifer Wadsworth](https://www.lancaster.ac.uk/~wadswojl/#).
+Code associated with <a href="https://arxiv.org/abs/2412.05195" target="_blank">the preprint</a>, by [Ryan Campbell](https://www.ryanstats.com/) and [Jennifer Wadsworth](https://www.lancaster.ac.uk/~wadswojl/#).
 
 ## Dependencies
 

@@ -6,9 +6,10 @@ library(geometry)
 library(geometricMVE)
 library(evd)
 library(mvtnorm)
+library(PWLExtremes)
 
-fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
+# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
+# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
 setwd("~/GitHub/PWLExtremes/example_code")
 
@@ -24,7 +25,7 @@ x<-qexp(evd::pgumbel(x))
 
 # # Gaussian data
 # x<-qexp(pnorm(mvtnorm::rmvnorm(5000,sigma=matrix(c(1,0.8,0.8,1),2,2))))
-# 
+#
 # # inverted logistic data
 # x<-rbvevd(5000,dep=0.7,mar1=c(1,1,1))
 # x<-1/x
@@ -43,6 +44,11 @@ excind<-r>r0w
 rexc<-r[excind]
 wexc<-w[excind]
 r0w<-r0w[excind]
+
+# plot the KDE threshold
+par(mfrow=c(1,1),pty="s")
+plot(x,pch=20,col="grey",xlim=c(0,11),ylim=c(0,11))
+lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
 
 # Fit the models
 par.locs = seq(0,1,length.out=11)
