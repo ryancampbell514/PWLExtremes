@@ -4,9 +4,10 @@ rm(list = ls())
 library(geometry)
 library(rgl)
 library(openair)
+library(PWLExtremes)
 
-fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
+# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
+# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
 setwd("~/GitHub/PWLExtremes/example_code")
 
@@ -69,11 +70,11 @@ proj.g.fn = function(gfun,w,which.w,nm,...){
   # gfun -> gauge that takes in 4-dim vectors
   # w -> 3-min input
   # which.w -> which index to take min over
-  
+
   w.inp = matrix(NA,nrow=nm,ncol=4)
   w.inp[,-which.w] = matrix(as.numeric(w),ncol=3,nrow=nm,byrow=T)
   w.inp[,which.w] = seq(0,1.3,length.out=nm)
-  
+
   return(min(gfun(w.inp,...)))
 }
 

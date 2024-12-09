@@ -8,9 +8,16 @@ library(evd)
 library(mvtnorm)
 library(rgl)
 library(lattice)
+library(PWLExtremes)
 
-fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
+usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
+                   -0.09606559,-0.2029479,0.974465668,0,
+                   0.38427672,0.8955331,0.224392071,0,
+                   0,0,0,1)
+                 ,4,4,byrow=T)
+
+# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
+# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
 setwd("~/GitHub/PWLExtremes/example_code")
 
@@ -27,7 +34,7 @@ x<--log(1-exp(-1/x))
 # asy <- list(0.5, 0, 0, c(0.5,0.5), c(0,0), c(0.5,1), c(.0,.0,.0))
 # x<-rmvevd(n, dep = c(.4), asy = asy, model = "alog", d = 3,mar=c(1,1,1))
 # x<--log(1-exp(-1/x))
-# 
+#
 # # Gaussian and asymmetric logistic mixture model
 # asy <- list(0, 0, 0, c(0.5,0.5), c(0,0), c(0,0), c(0.5,0.5,1))
 # rho=0.4
@@ -56,6 +63,18 @@ if(length(na.ind)>0){
   rexc<-rexc[-na.ind]
   wexc<-wexc[-na.ind,]
   r0w<-r0w[-na.ind]}
+
+# plot the KDE threshold
+w.mesh = qr$wpts
+n.mesh = sqrt(nrow(w.mesh))
+r.tau.mat = matrix(qr$r.tau.wpts, nrow=n.mesh, ncol=n.mesh)
+plot3d(x)
+surface3d(x=w.mesh[,1]*r.tau.mat,
+          y=w.mesh[,2]*r.tau.mat,
+          z=w.mesh[,3]*r.tau.mat,
+          col="red",alpha=0.5)
+axes3d(edges="bbox")
+view3d(userMatrix = usermat,zoom=0.8)
 
 # define the reference angles
 par.locs = seq(0,1,by=1/6)
@@ -88,14 +107,6 @@ model.fit.RW.unbounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const
 model.fit.RW.bounded = bound.fit(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.003333333,method="BFGS",fW.fit=T,joint.fit=T)
 
 # plot the unit level sets
-usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
-                   -0.09606559,-0.2029479,0.974465668,0,
-                   0.38427672,0.8955331,0.224392071,0,
-                   0,0,0,1)
-                 ,4,4,byrow=T)
-w.mesh = qr$wpts
-n.mesh = sqrt(nrow(w.mesh))
-
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.unbounded$mle,ref.angles=par.locs)
 g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
 open3d()
