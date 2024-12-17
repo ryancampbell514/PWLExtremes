@@ -52,7 +52,7 @@ lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
 
 # Fit the models
 par.locs = seq(0,1,length.out=11)
-model.fit.R.unbounded = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.04,method="BFGS")
+model.fit.R.unbounded = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.0,method="BFGS")
 model.fit.R.bounded = bound.fit.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.04,method="BFGS")
 model.fit.W = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.5,fW.fit=T,method="BFGS")
 model.fit.RW.unbounded = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.04,method="BFGS",fW.fit=T,joint.fit=T)

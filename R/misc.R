@@ -279,3 +279,58 @@ get_ref_angles = function(w, min.num = 30, gauss.corr=F){
 
   return(par.locs)
 }
+
+get_ref_angles_5d = function(w,min.num=50){
+
+  dd = dim(w)[2]
+
+  # define par.locs
+  # load("parlocs.RData")
+  par.locs = rbind(diag(5),
+                   rep(1/5,5),
+                   c(1/4,1/4,1/4,1/4,0),c(1/4,1/4,1/4,0,1/4),c(1/4,1/4,0,1/4,1/4),c(1/4,0,1/4,1/4,1/4),c(0,1/4,1/4,1/4,1/4),
+                   c(1/3,1/3,1/3,0,0),c(1/3,1/3,0,1/3,0),c(1/3,0,1/3,1/3,0),c(0,1/3,1/3,1/3,0),
+                   c(1/3,1/3,0,0,1/3),c(1/3,0,1/3,0,1/3),c(0,1/3,1/3,0,1/3),
+                   c(1/3,0,0,1/3,1/3), c(0,1/3,0,1/3,1/3), c(0,0,1/3,1/3,1/3),
+                   c(0.5,0.5,0,0,0),c(0.5,0,0.5,0,0),c(0.5,0,0,0.5,0),c(0.5,0,0,0,0.5),
+                   c(0,0.5,0.5,0,0),c(0,0.5,0,0.5,0),c(0,0.5,0,0,0.5),
+                   c(0,0,0.5,0.5,0),c(0,0,0.5,0,0.5),c(0,0,0,0.5,0.5)
+  )
+
+  numm = rep(0,nrow(par.locs))
+  while(any(numm < min.num)){
+
+    nlocs = dim(par.locs)[1]
+    which.adj.angles.res = which.adj.angles(w,par.locs)
+    numm = sapply(1:nlocs, function(loc.fix){
+      num = sum(sapply(which.adj.angles.res,function(lst){
+        locs = lst$loc.idx
+        return(loc.fix %in% locs)
+      }))
+      return(num)
+    })
+    # print(cbind(par.locs,numm))
+    # print(numm)
+    which.rm = numm < min.num & c(1:nrow(par.locs)) > dd
+    par.locs.new = par.locs[!which.rm,]
+    if(nrow(par.locs.new) == nrow(par.locs)){
+      ord = order(numm)
+      which.rm = ord[ord>dd][1]
+      par.locs = par.locs.new[-which.rm,]
+    } else {
+      par.locs = par.locs.new
+    }
+
+  }
+
+  # if(gauss.corr){
+  #   par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
+  #   par.locs = ifelse(par.locs<0,0,par.locs)
+  #   par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
+  #
+  # }
+
+
+  return(par.locs)
+}
+
