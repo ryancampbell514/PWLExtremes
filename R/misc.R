@@ -68,7 +68,7 @@ delaunayn <-
     }
 
     ## Combine and check options
-    options <- tryCatch(qhull.options(options, output.options, supported_output.options  <- c("Fa", "Fn"), full=full), error=function(e) {stop(e)})
+    options <- tryCatch(geometry::qhull.options(options, output.options, supported_output.options  <- c("Fa", "Fn"), full=full), error=function(e) {stop(e)})
 
     ## It is essential that delaunayn is called with either the QJ or Qt
     ## option. Otherwise it may return a non-triangulated structure, i.e
