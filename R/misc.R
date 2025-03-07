@@ -1,3 +1,45 @@
+# A clone of the geometry::delaunayn function, without the recent
+# update (Feb 2025) with typos
+delaunayn = function (p, options = NULL, output.options = NULL, full = FALSE) {
+  tmp_stdout <- tempfile("Rf")
+  tmp_stderr <- tempfile("Rf")
+  on.exit(unlink(c(tmp_stdout, tmp_stderr)))
+  if (is.data.frame(p)) {
+    p <- as.matrix(p)
+  }
+  storage.mode(p) <- "double"
+  if (any(is.na(p))) {
+    stop("The first argument should not contain any NAs")
+  }
+  if (is.null(options)) {
+    if (ncol(p) < 4) {
+      options <- "Qt Qc Qz"
+    }
+    else {
+      options <- "Qt Qc Qx"
+    }
+  }
+  options <- tryCatch(qhull.options(options, output.options,
+                                    supported_output.options <- c("Fa", "Fn"), full = full),
+                      error = function(e) {
+                        stop(e)
+                      })
+  if (!grepl("Qt", options) & !grepl("QJ", options)) {
+    options <- paste(options, "Qt")
+  }
+  out <- .Call("C_delaunayn", p, as.character(options), tmp_stdout,
+               tmp_stderr, PACKAGE = "geometry")
+  out[which(sapply(out, is.null))] <- NULL
+  if (is.null(out$areas) & is.null(out$neighbours)) {
+    attr(out$tri, "delaunayn") <- attr(out$tri, "delaunayn")
+    return(out$tri)
+  }
+  class(out) <- "delaunayn"
+  out$p <- p
+  return(out)
+}
+
+
 
 ###############################################################################
 ################################  d=2  ########################################
@@ -92,7 +134,7 @@ which.adj.angles = function(angles,locs){
 
   num.cols = dim(locs)[2]
 
-  del.tri = geometry::delaunayn(p=locs[,-num.cols], output.options=TRUE)
+  del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
   w.adj.angles = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
                           t=del.tri$tri,
                           xi=matrix(angles[,-num.cols],ncol=num.cols-1))
@@ -109,7 +151,7 @@ G.vol = function(gauge.pars,par.locs){
   num.cols = dim(par.locs)[2]
 
   # Method 2: coordinate geometry
-  del.tri = geometry::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)
+  del.tri = PWLExtremes::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)
   nodes = del.tri$tri
   vol = (1/factorial(num.cols))*sum(apply(nodes,1,function(loc){
     pp = gauge.pars[loc]
