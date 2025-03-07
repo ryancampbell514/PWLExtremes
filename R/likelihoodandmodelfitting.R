@@ -331,7 +331,7 @@ bound.fit.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val
 pwl.L1.pen = function(psi,locs){
   # Experimental L1 penalty
 
-  require(geometry)
+  #require(geometry)
   pen.vals = sapply(1:length(psi), function(i){
     # print(locs[i,])
     psi.i = psi[i]
@@ -346,7 +346,7 @@ pwl.L1.pen = function(psi,locs){
   return(mean(pen.vals,na.rm=T))  # used to be sum
 }
 pwl.L2.pen = function(psi,locs,del.tri){
-  require(geometry)
+  #require(geometry)
   tri = del.tri$tri
 
   locs.scaled = locs*psi

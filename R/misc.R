@@ -1,43 +1,110 @@
 # A clone of the geometry::delaunayn function, without the recent
 # update (Feb 2025) with typos
-delaunayn = function (p, options = NULL, output.options = NULL, full = FALSE) {
-  tmp_stdout <- tempfile("Rf")
-  tmp_stderr <- tempfile("Rf")
-  on.exit(unlink(c(tmp_stdout, tmp_stderr)))
-  if (is.data.frame(p)) {
-    p <- as.matrix(p)
-  }
-  storage.mode(p) <- "double"
-  if (any(is.na(p))) {
-    stop("The first argument should not contain any NAs")
-  }
-  if (is.null(options)) {
+# delaunayn = function (p, options = NULL, output.options = NULL, full = FALSE) {
+#   tmp_stdout <- tempfile("Rf")
+#   tmp_stderr <- tempfile("Rf")
+#   on.exit(unlink(c(tmp_stdout, tmp_stderr)))
+#   if (is.data.frame(p)) {
+#     p <- as.matrix(p)
+#   }
+#   storage.mode(p) <- "double"
+#   if (any(is.na(p))) {
+#     stop("The first argument should not contain any NAs")
+#   }
+#   if (is.null(options)) {
+#     if (ncol(p) < 4) {
+#       options <- "Qt Qc Qz"
+#     }
+#     else {
+#       options <- "Qt Qc Qx"
+#     }
+#   }
+#   options <- tryCatch(qhull.options(options, output.options,
+#                                     supported_output.options <- c("Fa", "Fn"), full = full),
+#                       error = function(e) {
+#                         stop(e)
+#                       })
+#   if (!grepl("Qt", options) & !grepl("QJ", options)) {
+#     options <- paste(options, "Qt")
+#   }
+#   out <- .Call("C_delaunayn", p, as.character(options), tmp_stdout,
+#                tmp_stderr, PACKAGE = "geometry")
+#   out[which(sapply(out, is.null))] <- NULL
+#   if (is.null(out$areas) & is.null(out$neighbours)) {
+#     attr(out$tri, "delaunayn") <- attr(out$tri, "delaunayn")
+#     return(out$tri)
+#   }
+#   class(out) <- "delaunayn"
+#   out$p <- p
+#   return(out)
+# }
+delaunayn <-
+  function(p, options=NULL, output.options=NULL, full=FALSE) {
+    tmp_stdout <- tempfile("Rf")
+    tmp_stderr <- tempfile("Rf")
+    on.exit(unlink(c(tmp_stdout, tmp_stderr)))
+
+    ## Coerce the input to be matrix
+    if (is.data.frame(p)) {
+      p <- as.matrix(p)
+    }
+
+    ## Make sure we have real-valued input
+    storage.mode(p) <- "double"
+
+    ## We need to check for NAs in the input, as these will crash the C
+    ## code.
+    if (any(is.na(p))) {
+      stop("The first argument should not contain any NAs")
+    }
+
+    ## Default options
+    default.options <- "Qt Qc Qx"
     if (ncol(p) < 4) {
-      options <- "Qt Qc Qz"
+      default.options <- "Qt Qc Qz"
     }
-    else {
-      options <- "Qt Qc Qx"
+    if (is.null(options)) {
+      options <- default.options
     }
+
+    ## Combine and check options
+    options <- tryCatch(qhull.options(options, output.options, supported_output.options  <- c("Fa", "Fn"), full=full), error=function(e) {stop(e)})
+
+    ## It is essential that delaunayn is called with either the QJ or Qt
+    ## option. Otherwise it may return a non-triangulated structure, i.e
+    ## one with more than dim+1 points per structure, where dim is the
+    ## dimension in which the points p reside.
+    if (!grepl("Qt", options) & !grepl("QJ", options)) {
+      options <- paste(options, "Qt")
+    }
+
+    out <- .Call("C_delaunayn", p, as.character(options), tmp_stdout, tmp_stderr, PACKAGE="geometry")
+
+    ## Check for points missing from triangulation, but not in the case
+    ## of a degenerate trianguation (zero rows in output)
+    if (nrow(out$tri) > 0) {
+      missing.points <- length(setdiff(seq(1,nrow(p)), unique(as.vector(out$tri))))
+      if (missing.points > 0) {
+        warning(paste0(missing.points, " points missing from triangulation.
+It is possible that setting the 'options' argument of delaunayn may help.
+For example:
+options = \"", default.options, " Qbb\"
+options = \"", default.options, " QbB\"
+If these options do not work, try shifting the centre of the points
+to the origin by subtracting the mean coordinates from every point."))
+      }
+    }
+
+    # Remove NULL elements
+    out[which(sapply(out, is.null))] <- NULL
+    if (is.null(out$areas) & is.null(out$neighbours)) {
+      attr(out$tri, "delaunayn") <- attr(out$tri, "delaunayn")
+      return(out$tri)
+    }
+    class(out) <- "delaunayn"
+    out$p <- p
+    return(out)
   }
-  options <- tryCatch(qhull.options(options, output.options,
-                                    supported_output.options <- c("Fa", "Fn"), full = full),
-                      error = function(e) {
-                        stop(e)
-                      })
-  if (!grepl("Qt", options) & !grepl("QJ", options)) {
-    options <- paste(options, "Qt")
-  }
-  out <- .Call("C_delaunayn", p, as.character(options), tmp_stdout,
-               tmp_stderr, PACKAGE = "geometry")
-  out[which(sapply(out, is.null))] <- NULL
-  if (is.null(out$areas) & is.null(out$neighbours)) {
-    attr(out$tri, "delaunayn") <- attr(out$tri, "delaunayn")
-    return(out$tri)
-  }
-  class(out) <- "delaunayn"
-  out$p <- p
-  return(out)
-}
 
 
 
@@ -121,7 +188,7 @@ G.vol.2d = function(gauge.pars,par.locs,marg="pos"){
 ###############################################################################
 
 which.adj.angles = function(angles,locs){
-  require(geometry)
+  #require(geometry)
 
   # angles are d-dimensional
 
