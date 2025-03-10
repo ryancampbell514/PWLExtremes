@@ -221,7 +221,7 @@ G.vol.2d = function(gauge.pars,par.locs,marg="pos"){
 ###############################################################################
 
 which.adj.angles = function(angles,locs){
-  #require(geometry)
+  require(geometry)
 
   # angles are d-dimensional
 
