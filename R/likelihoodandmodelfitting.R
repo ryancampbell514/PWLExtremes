@@ -328,23 +328,23 @@ bound.fit.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val
 
 # general d-dimensional model fitting for when w is on the simplex.
 
-pwl.L1.pen = function(psi,locs){
-  # Experimental L1 penalty
-
-  require(geometry)
-  pen.vals = sapply(1:length(psi), function(i){
-    # print(locs[i,])
-    psi.i = psi[i]
-    locs.i = locs[i,]
-    psi.rest = psi[-i]
-    locs.rest = locs[-i,]
-    suppressWarnings({
-      g.val.i = gfun.pwl(x=locs.i,par = psi.rest,ref.angles=locs.rest)
-    })
-    return(abs(psi.i - (1/g.val.i)))
-  })
-  return(mean(pen.vals,na.rm=T))  # used to be sum
-}
+# pwl.L1.pen = function(psi,locs){
+#   # Experimental L1 penalty
+#
+#   require(geometry)
+#   pen.vals = sapply(1:length(psi), function(i){
+#     # print(locs[i,])
+#     psi.i = psi[i]
+#     locs.i = locs[i,]
+#     psi.rest = psi[-i]
+#     locs.rest = locs[-i,]
+#     suppressWarnings({
+#       g.val.i = gfun.pwl(x=locs.i,par = psi.rest,ref.angles=locs.rest)
+#     })
+#     return(abs(psi.i - (1/g.val.i)))
+#   })
+#   return(mean(pen.vals,na.rm=T))  # used to be sum
+# }
 pwl.L2.pen = function(psi,locs,del.tri){
   require(geometry)
   tri = del.tri$tri
@@ -393,7 +393,7 @@ pwl.L2.pen = function(psi,locs,del.tri){
   return(mean(pen))   # used to be sum
 }
 
-nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit, pen.const.L2=0, pos.par=TRUE){
+nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
 
   # ensure we have no negative parameters
   if(pos.par) {
@@ -432,9 +432,9 @@ nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit
   #   L1.pen.val = pwl.L1.pen(psi=psi,locs=locs)
   #   NLL = NLL+(pen.const.L1*L1.pen.val)
   # }
-  if(pen.const.L2>0){
+  if(pen.const>0){
     L2.pen.val = pwl.L2.pen(psi=psi,locs=locs,del.tri=del.tri)
-    NLL = NLL+(pen.const.L2*L2.pen.val)
+    NLL = NLL+(pen.const*L2.pen.val)
   }
   # print(psi)
   # print(NLL)
@@ -442,8 +442,9 @@ nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit
 }
 
 fit.pwlin = function(r, r0w, w, locs,
-                        init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE, joint.fit=FALSE,bound=FALSE,method="BFGS",
-                        pen.const.L2=0,...){
+                        init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
+                     joint.fit=FALSE,bound=FALSE,method="BFGS",
+                        pen.const=0,...){
   if(is.null(init.val)){
     init.val = rep(1,nrow(locs))
   }
@@ -458,7 +459,7 @@ fit.pwlin = function(r, r0w, w, locs,
     opt <- optim(nll.pwlin, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
                  fW.fit=F,joint.fit=F,
-                 pen.const.L2=pen.const.L2,
+                 pen.const=pen.const,
                  del.tri=del.tri,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = NULL  # didn't model angles
@@ -467,7 +468,7 @@ fit.pwlin = function(r, r0w, w, locs,
     opt <- optim(nll.pwlin, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
                  fW.fit=T,joint.fit=T,
-                 pen.const.L2=pen.const.L2,
+                 pen.const=pen.const,
                  del.tri=del.tri,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = opt$par
@@ -477,7 +478,7 @@ fit.pwlin = function(r, r0w, w, locs,
     opt <- optim(nll.pwlin, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
                  fW.fit=T,joint.fit=F,
-                 pen.const.L2=pen.const.L2,
+                 pen.const=pen.const,
                  del.tri=del.tri,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = opt$par
