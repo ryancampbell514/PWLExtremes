@@ -76,16 +76,19 @@ nll.pwlin.2d = function(psi, r, r0w, w.adj.angles, locs, norm, marg, pen.norm , 
   }
 }
 
-fit.pwlin.2d = function(r, r0w, w, locs, norm=NULL,marg="pos", pen.norm="2", pen.adj=F, init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE, joint.fit=FALSE,bound=FALSE,pen.const=0,method="BFGS",...){
+opt.pwl.2d = function(NLL, r, r0w, w, locs,
+                      init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
+                      joint.fit=FALSE,method="BFGS",
+                      pen.const=0,pen.adj=FALSE,...){
   # w.adj.angles -> output of "which.adj.angles.2d"
 
-  if(is.null(init.val)){
-    init.val = rep(1,length(locs))
-  }
+  # if(is.null(init.val)){
+  #   init.val = rep(1,length(locs))
+  # }
   w.adj.angles = which.adj.angles.2d(w,locs,norm=NULL,marg=marg)
   if(fixed.shape & !fW.fit & !joint.fit){
     # only fit the conditional radial model
-    opt <- optim(nll.pwlin.2d, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
                  pen.norm=pen.norm, pen.adj=pen.adj,
                  fW.fit=F,joint.fit=F,pen.const=pen.const,fixed.shape=fixed.shape,
@@ -96,7 +99,7 @@ fit.pwlin.2d = function(r, r0w, w, locs, norm=NULL,marg="pos", pen.norm="2", pen
     opt$shape=2
   } else if(fixed.shape & fW.fit & joint.fit){
     # only fit the radial model and angular model togethr
-    opt <- optim(nll.pwlin.2d, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
                  pen.norm=pen.norm, pen.adj=pen.adj,
                  fW.fit=T,joint.fit=T,pen.const=pen.const,fixed.shape=fixed.shape,
@@ -107,7 +110,7 @@ fit.pwlin.2d = function(r, r0w, w, locs, norm=NULL,marg="pos", pen.norm="2", pen
   } else if(fixed.shape & fW.fit & !joint.fit){
     # only fit the angular model together, taking into account the redundancy
     init.val = init.val[-1]  # remove redundancy, fix the first parameter to 1.
-    opt <- optim(nll.pwlin.2d, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
                  pen.norm=pen.norm, pen.adj=pen.adj,
                  fW.fit=T,joint.fit=F,pen.const=pen.const,fixed.shape=fixed.shape,
@@ -118,7 +121,7 @@ fit.pwlin.2d = function(r, r0w, w, locs, norm=NULL,marg="pos", pen.norm="2", pen
     opt$init.val = c(1,init.val)
     opt$shape=2
   } else if(!fixed.shape){
-    opt <- optim(nll.pwlin.2d, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
                  pen.norm=pen.norm, pen.adj=pen.adj,
                  fW.fit=F,joint.fit=F,pen.const=pen.const,fixed.shape=fixed.shape,
@@ -130,13 +133,21 @@ fit.pwlin.2d = function(r, r0w, w, locs, norm=NULL,marg="pos", pen.norm="2", pen
     opt$par = opt$par[-1]
   }
   opt$aic = 2*(opt$value + length(opt$par))
-  return(list(mle = opt$par,fW.mle = opt$fW.par, shape=opt$shape, nll = opt$value, convergence = opt$conv,
+  # return(list(mle = opt$par,fW.mle = opt$fW.par, shape=opt$shape, nll = opt$value, convergence = opt$conv,
+  #             aic = opt$aic, init.val = opt$init.val))
+  return(list(mle = opt$par, fW.mle = opt$fW.par, shape=2,
+              nllh = opt$value, convergence = opt$conv,
               aic = opt$aic, init.val = opt$init.val))
 }
 
-bound.fit.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val=NULL, pen.adj=F, fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,pen.const=0,method="BFGS",...){
+# fit.pwlin.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val=NULL, pen.adj=F, fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,pen.const=0,method="BFGS",...){
+fit.pwlin.2d = function(r,w,r0w,locs,
+                     init.val=NULL,fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,
+                     method="BFGS",pen.const=0,bound.fit=FALSE,
+                     marg="pos",pen.norm="2",...){
 
-  # implement Algorithm 1 in the manuscript
+  ################# left off here 11-03-2025 ##################
+
 
   if(is.null(init.val)){
     init.val = rep(1,length(locs))
@@ -144,66 +155,92 @@ bound.fit.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val
 
   gfun=function(x,par) {gfun.2d(x,par,ref.angles=locs)}
 
-  if(fW.fit & !joint.fit){
-    stop("No need to bound anglar parameters if not jointly fitting.")
-  }
-
-  lik.custom = function(psi, r, r0w, w.adj.angles,
-                        locs, norm, marg,
-                        pen.norm, pen.adj,
-                        fixed.pars, fixed.pars.idx,
-                        fW.fit,joint.fit,pen.const){
-
-    par.full = numeric(length(locs))
-    par.full[fixed.pars.idx] = fixed.pars
-    par.full[-fixed.pars.idx] = psi
-
-    return(nll.pwlin.2d(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
-                        locs=locs,norm=norm,marg=marg,
-                        pen.norm=pen.norm, pen.adj=pen.adj,
-                        fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const))
-  }
+  t1 = Sys.time()
 
   nnodes=length(locs)
   w.adj.angles = which.adj.angles.2d(angles=w, locs, norm, marg)
-  model.fit = fit.pwlin.2d(r=r, r0w=r0w,w=w,locs=locs,init.val=init.val,norm=norm,marg=marg,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const)
-  mle=model.fit$mle
+  opt = opt.pwl.2d(NLL=nll.pwlin.2d, r=r, r0w=r0w,w=w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const)
 
-  # stop("generalise this to use the 1 or 2 norm")
+  if(bound.fit){
+    if(fW.fit & !joint.fit){
+      stop("No need to bound anglar parameters if not jointly fitting.")
+    }
 
-  fixed.pars.idx = c()
+    mle=opt$mle
 
-  if(marg=="pos"){
-    keep.fitting = any(round(as.numeric(apply(cbind(locs,1-locs)/sapply(locs,gfun,par=mle),2,max)),6)!=1)
-  } else if(marg=="Rd"){
-    locs.cart = pol2cart.L1Rd(w=locs)
-    keep.fitting = any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,min)),6)!=-1) &
-      any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,max)),6)!=1)
-  }
+    lik.custom = function(psi, r, r0w, w.adj.angles,
+                          locs, norm, marg,
+                          pen.norm, pen.adj,
+                          fixed.pars, fixed.pars.idx,
+                          fW.fit,joint.fit,pen.const,fixed.shape=T){
 
-  max.iters=100
-  iters=1
-  while(keep.fitting){
+      par.full = numeric(length(locs))
+      par.full[fixed.pars.idx] = fixed.pars
+      par.full[-fixed.pars.idx] = psi
+
+      return(nll.pwlin.2d(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
+                          locs=locs,norm=norm,marg=marg,
+                          pen.norm=pen.norm, pen.adj=pen.adj,
+                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const))
+    }
+
+
+
+    # stop("generalise this to use the 1 or 2 norm")
+
+    fixed.pars.idx = c()
+
     if(marg=="pos"){
-      if(0.5 %in% locs){
+      keep.fitting = any(round(as.numeric(apply(cbind(locs,1-locs)/sapply(locs,gfun,par=mle),2,max)),6)!=1)
+    } else if(marg=="Rd"){
+      locs.cart = pol2cart.L1Rd(w=locs)
+      keep.fitting = any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,min)),6)!=-1) &
+        any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,max)),6)!=1)
+    }
 
-        idx.x  = locs >= 0.5
-        idx.y  = locs <= 0.5
-        idx.xy = locs == 0.5
-        cm.x = max(locs/sapply(locs,gfun,par=mle))
-        cm.y = max((1-locs)/sapply(locs,gfun,par=mle))
-        cm.xy = 0.5/sapply(0.5,gfun,par=mle)
-        if(cm.x==cm.xy & cm.y==cm.xy){
-          which.cm = which(locs==0.5)
-          mle[which.cm] = mle[which.cm]/cm.xy  # re-scale
-          if(is.null(fixed.pars.idx)){
-            fixed.pars.idx = which.cm
+    max.iters=100
+    iters=1
+    while(keep.fitting){
+      if(marg=="pos"){
+        if(0.5 %in% locs){
+
+          idx.x  = locs >= 0.5
+          idx.y  = locs <= 0.5
+          idx.xy = locs == 0.5
+          cm.x = max(locs/sapply(locs,gfun,par=mle))
+          cm.y = max((1-locs)/sapply(locs,gfun,par=mle))
+          cm.xy = 0.5/sapply(0.5,gfun,par=mle)
+          if(cm.x==cm.xy & cm.y==cm.xy){
+            which.cm = which(locs==0.5)
+            mle[which.cm] = mle[which.cm]/cm.xy  # re-scale
+            if(is.null(fixed.pars.idx)){
+              fixed.pars.idx = which.cm
+            } else {
+              fixed.pars.idx = sort(c(fixed.pars.idx,which.cm))
+            }
+
           } else {
-            fixed.pars.idx = sort(c(fixed.pars.idx,which.cm))
-          }
+            # max isn't on the diagonal
+            # find the componentiwse max, and re-scale the corresponding MLEs
+            idx.x = locs > 0.5
+            idx.y = locs < 0.5
+            unitg.x = locs/sapply(locs,gfun,par=mle)
+            unitg.x[!idx.x] = 0
+            unitg.y = (1-locs)/sapply(locs,gfun,par=mle)
+            unitg.y[!idx.y] = 0
+            which.cm.x = which.max(unitg.x)
+            which.cm.y = which.max(unitg.y)
+            mle[which.cm.x] = mle[which.cm.x]/(unitg.x[which.cm.x])
+            mle[which.cm.y] = mle[which.cm.y]/(unitg.y[which.cm.y])
 
+            # which mle's are re-scaled
+            if(is.null(fixed.pars.idx)){
+              fixed.pars.idx = sort(c(which.cm.x,which.cm.y))
+            } else {
+              fixed.pars.idx = sort(c(fixed.pars.idx,which.cm.x,which.cm.y))
+            }
+          }
         } else {
-          # max isn't on the diagonal
           # find the componentiwse max, and re-scale the corresponding MLEs
           idx.x = locs > 0.5
           idx.y = locs < 0.5
@@ -220,108 +257,115 @@ bound.fit.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val
           if(is.null(fixed.pars.idx)){
             fixed.pars.idx = sort(c(which.cm.x,which.cm.y))
           } else {
-            fixed.pars.idx = sort(c(fixed.pars.idx,which.cm.x,which.cm.y))
+            fixed.pars.idx = unique(sort(c(fixed.pars.idx,which.cm.x,which.cm.y)))
           }
         }
-      } else {
-        # find the componentiwse max, and re-scale the corresponding MLEs
-        idx.x = locs > 0.5
-        idx.y = locs < 0.5
-        unitg.x = locs/sapply(locs,gfun,par=mle)
-        unitg.x[!idx.x] = 0
-        unitg.y = (1-locs)/sapply(locs,gfun,par=mle)
-        unitg.y[!idx.y] = 0
-        which.cm.x = which.max(unitg.x)
-        which.cm.y = which.max(unitg.y)
-        mle[which.cm.x] = mle[which.cm.x]/(unitg.x[which.cm.x])
-        mle[which.cm.y] = mle[which.cm.y]/(unitg.y[which.cm.y])
+      } else if(marg=="Rd"){
+        unitg.coords = locs.cart/sapply(locs,gfun,par=mle)
+        max.x.idx=which.max(unitg.coords[,1])
+        min.x.idx=which.min(unitg.coords[,1])
+        max.y.idx=which.max(unitg.coords[,2])
+        min.y.idx=which.min(unitg.coords[,2])
 
-        # which mle's are re-scaled
+        mle[max.x.idx] = abs(mle[max.x.idx]/(unitg.coords[max.x.idx,1]))
+        mle[max.y.idx] = abs(mle[max.y.idx]/(unitg.coords[max.y.idx,2]))
+
+        mle[min.x.idx] = abs(mle[min.x.idx]/(unitg.coords[min.x.idx,1]))
+        mle[min.y.idx] = abs(mle[min.y.idx]/(unitg.coords[min.y.idx,2]))
+
         if(is.null(fixed.pars.idx)){
-          fixed.pars.idx = sort(c(which.cm.x,which.cm.y))
+          fixed.pars.idx = sort(c(max.x.idx,max.y.idx,min.x.idx,min.y.idx))
         } else {
-          fixed.pars.idx = unique(sort(c(fixed.pars.idx,which.cm.x,which.cm.y)))
+          fixed.pars.idx = unique(sort(c(fixed.pars.idx,max.x.idx,max.y.idx,min.x.idx,min.y.idx)))
         }
       }
-    } else if(marg=="Rd"){
-      unitg.coords = locs.cart/sapply(locs,gfun,par=mle)
-      max.x.idx=which.max(unitg.coords[,1])
-      min.x.idx=which.min(unitg.coords[,1])
-      max.y.idx=which.max(unitg.coords[,2])
-      min.y.idx=which.min(unitg.coords[,2])
 
-      mle[max.x.idx] = abs(mle[max.x.idx]/(unitg.coords[max.x.idx,1]))
-      mle[max.y.idx] = abs(mle[max.y.idx]/(unitg.coords[max.y.idx,2]))
-
-      mle[min.x.idx] = abs(mle[min.x.idx]/(unitg.coords[min.x.idx,1]))
-      mle[min.y.idx] = abs(mle[min.y.idx]/(unitg.coords[min.y.idx,2]))
-
-      if(is.null(fixed.pars.idx)){
-        fixed.pars.idx = sort(c(max.x.idx,max.y.idx,min.x.idx,min.y.idx))
+      # re-fit the model
+      if(fixed.shape & !fW.fit & !joint.fit){
+        # only fit the conditional radial model
+        init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
+        # opt <- optim(lik.custom, par = init.vals, r = r,
+        #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
+        #              pen.norm=pen.norm, pen.adj=pen.adj,
+        #              fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,
+        #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
+        #              control=list(maxit=1e6),method=method)  #method="L-BFGS-B",gr=NULL,lower=rep(0.01,length(locs)-length(fixed.pars.idx)),upper=rep(10,length(locs)-length(fixed.pars.idx))
+        opt2 = opt.pwl.2d(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                          fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx)
+        opt2$fW.par = NULL  # didn't model angles
+      } else if(fixed.shape & fW.fit & joint.fit){
+        # only fit the radial model and angular model together
+        init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
+        # opt <- optim(lik.custom, par = init.vals, r = r,
+        #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
+        #              pen.norm=pen.norm, pen.adj=pen.adj,
+        #              fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,
+        #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
+        #              control=list(maxit=1e6),method=method)
+        opt2 = opt.pwl.2d(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                          fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx)
+        opt2$fW.par = opt2$mle
       } else {
-        fixed.pars.idx = unique(sort(c(fixed.pars.idx,max.x.idx,max.y.idx,min.x.idx,min.y.idx)))
+        stop("ERROR in likelihood setup.")
       }
-    }
 
-    # re-fit the model
-    if(fixed.shape & !fW.fit & !joint.fit){
-      # only fit the conditional radial model
-      init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
-      opt <- optim(lik.custom, par = init.vals, r = r,
-                   r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
-                   pen.norm=pen.norm, pen.adj=pen.adj,
-                   fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,
-                   fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
-                   control=list(maxit=1e6),method=method)  #method="L-BFGS-B",gr=NULL,lower=rep(0.01,length(locs)-length(fixed.pars.idx)),upper=rep(10,length(locs)-length(fixed.pars.idx))
-      opt$fW.par = NULL  # didn't model angles
-    } else if(fixed.shape & fW.fit & joint.fit){
-      # only fit the radial model and angular model together
-      init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
-      opt <- optim(lik.custom, par = init.vals, r = r,
-                   r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
-                   pen.norm=pen.norm, pen.adj=pen.adj,
-                   fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,
-                   fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
-                   control=list(maxit=1e6),method=method)
-      opt$fW.par = opt$par
+      mle[-fixed.pars.idx] = opt2$mle
+
+      if(marg=="pos"){
+        locs.cart = cbind(locs,1-locs)
+        keep.fitting = any(round(as.numeric(apply(cbind(locs,1-locs)/sapply(locs,gfun,par=mle),2,max)),6)!=1)
+      } else if(marg=="Rd"){
+        locs.cart = pol2cart.L1Rd(w=locs)
+        keep.fitting = any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,min)),6)!=-1) &
+          any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,max)),6)!=1)
+      }
+
+      if(!keep.fitting){
+        # message(paste("comp. min:",paste(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,min)),collapse=" ")))
+        # message(paste("comp. max:",paste(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,max)),collapse=" ")))
+        break
+      }
+
+      iters=iters+1
+      if(iters>max.iters){
+        message("Max iters in bounding algorithm reached.")
+        break
+      }
+
+    }
+    # return(list(mle=mle,
+    #             idx=fixed.pars.idx,
+    #             nll=opt$value))
+    t2 = Sys.time()
+
+    if(joint.fit){
+      fW.mle = mle
     } else {
-      stop("ERROR in likelihood setup.")
+      fW.mle = NULL
     }
 
-    mle[-fixed.pars.idx] = opt$par
+    return(list(mle =mle,
+                fixed.pars.idx=fixed.pars.idx,
+                fW.mle = fW.mle,
+                shape=2,
+                nll = NULL,
+                convergence = opt2$conv,
+                init.val = init.val,
+                info=t2-t1))
+  } else {
+    t2 = Sys.time()
 
-    if(marg=="pos"){
-      locs.cart = cbind(locs,1-locs)
-      keep.fitting = any(round(as.numeric(apply(cbind(locs,1-locs)/sapply(locs,gfun,par=mle),2,max)),6)!=1)
-    } else if(marg=="Rd"){
-      locs.cart = pol2cart.L1Rd(w=locs)
-      keep.fitting = any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,min)),6)!=-1) &
-        any(round(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,max)),6)!=1)
-    }
-
-    if(!keep.fitting){
-      message(paste("comp. min:",paste(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,min)),collapse=" ")))
-      message(paste("comp. max:",paste(as.numeric(apply(locs.cart/sapply(locs,gfun,par=mle),2,max)),collapse=" ")))
-      break
-    }
-
-    iters=iters+1
-    if(iters>max.iters){
-      message("max iters in bounding reached")
-      break
-    }
-
+    return(list(mle =opt$mle,
+                fixed.pars.idx=NULL,
+                fW.mle = opt$fW.mle,
+                shape=2,
+                nll = opt$value,
+                convergence = opt$conv,
+                init.val = init.val,
+                info=t2-t1))
   }
-  # return(list(mle=mle,
-  #             idx=fixed.pars.idx,
-  #             nll=opt$value))
-  return(list(mle =mle,
-       fixed.pars.idx=fixed.pars.idx,
-       fW.mle = NA,
-       shape=2,
-       nll = opt$value,
-       convergence = opt$conv,
-       init.val = init.val))
 }
 
 ######################################################################
@@ -441,10 +485,13 @@ nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit
   return(NLL)
 }
 
-fit.pwlin = function(r, r0w, w, locs,
-                        init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
-                     joint.fit=FALSE,bound=FALSE,method="BFGS",
-                        pen.const=0,...){
+opt.pwl = function(NLL, r, r0w, w, locs,
+                     init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
+                     joint.fit=FALSE,method="BFGS",
+                     pen.const=0,...){
+
+  # t1 = Sys.time()
+
   if(is.null(init.val)){
     init.val = rep(1,nrow(locs))
   }
@@ -456,7 +503,7 @@ fit.pwlin = function(r, r0w, w, locs,
 
   if(fixed.shape & !fW.fit & !joint.fit){
     # fit the conditional radial model only
-    opt <- optim(nll.pwlin, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
                  fW.fit=F,joint.fit=F,
                  pen.const=pen.const,
@@ -465,7 +512,7 @@ fit.pwlin = function(r, r0w, w, locs,
     opt$fW.par = NULL  # didn't model angles
   } else if(fixed.shape & fW.fit & joint.fit){
     # fit the radial model and angular model together
-    opt <- optim(nll.pwlin, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
                  fW.fit=T,joint.fit=T,
                  pen.const=pen.const,
@@ -475,7 +522,7 @@ fit.pwlin = function(r, r0w, w, locs,
   } else if(fixed.shape & fW.fit & !joint.fit){
     # fit the angular model only
     init.val = init.val[-1]  # remove redundancy, fit the first parameter to 1.
-    opt <- optim(nll.pwlin, par = init.val, r = r,
+    opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
                  fW.fit=T,joint.fit=F,
                  pen.const=pen.const,
@@ -487,6 +534,9 @@ fit.pwlin = function(r, r0w, w, locs,
   } else if(!fixed.shape){
     stop("fitting shape not implemented.")
   }
+
+  # t2 = Sys.time()
+
   opt$init.val = init.val#c(3,init.val)
   opt$aic = 2*(opt$value + length(opt$par))
   return(list(mle = opt$par, fW.mle = opt$fW.par, shape=dim(w)[2],
@@ -494,11 +544,15 @@ fit.pwlin = function(r, r0w, w, locs,
               aic = opt$aic, init.val = opt$init.val))
 }
 
-bound.fit = function(r,w,r0w,locs,init.val=NULL,fixed.shape=TRUE,fW.fit=F,joint.fit=F,method="BFGS",pen.const=0,...){
+fit.pwlin = function(r,w,r0w,locs,
+                     init.val=NULL,fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,
+                     method="BFGS",pen.const=0,bound.fit=FALSE,...){
 
-  if(fW.fit & !joint.fit){
+  if(fW.fit & !joint.fit & bound.fit){
     stop("No need to bound anglar parameters if not jointly fitting.")
   }
+
+  t1 = Sys.time()
 
   if(is.null(init.val)){
     init.val = rep(1,nrow(locs))
@@ -510,89 +564,129 @@ bound.fit = function(r,w,r0w,locs,init.val=NULL,fixed.shape=TRUE,fW.fit=F,joint.
   del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
 
   # fixed.pars.idx=NULL
-  opt <- fit.pwlin(r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,...)
-  mle = opt$mle
+  opt <- opt.pwl(NLL=nll.pwlin,r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,...)
 
-  lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, fixed.pars,
-                        fixed.pars.idx, fW.fit, joint.fit, pos.par = TRUE,
-                        pen.const=0,del.tri=del.tri){
+  # print(opt)
 
-    psi.full = numeric(nrow(locs))
-    psi.full[fixed.pars.idx] = fixed.pars
-    psi.full[-fixed.pars.idx] = psi
+  if(bound.fit){
 
-    # if(pos.par) {
-    #   if (any(psi.full <= 0)){
-    #     return(1e+11)
-    #   }
-    # }
+    mle = opt$mle
 
-    return(nll.pwlin(psi=psi.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
-                     locs=locs, fW.fit=fW.fit, joint.fit=joint.fit, pos.par=TRUE,
-                     pen.const=pen.const,del.tri=del.tri))
+    lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, fixed.pars,
+                          fixed.pars.idx, fW.fit, joint.fit, pos.par = TRUE,
+                          pen.const=0,del.tri=del.tri){
 
-  }
-  fixed.pars.idx = c()
-  is.bounded=F   # kind of like a dummy variable, will terminate the loop inside
-  while(!is.bounded){
-    # print(i)
+      psi.full = numeric(nrow(locs))
+      psi.full[fixed.pars.idx] = fixed.pars
+      psi.full[-fixed.pars.idx] = psi
 
-    # evaluate at nodes
-    unitg = locs/gfun.pwl(x=locs,par=mle,ref.angles=locs)#apply(locs,1,gfun.4d,par=mle,ref.angles=locs)  # need to round here
+      # if(pos.par) {
+      #   if (any(psi.full <= 0)){
+      #     return(1e+11)
+      #   }
+      # }
 
-    # what is max along nodes
-    max.vals = apply(unitg,2, max)
-    which.max.vals = apply(unitg,2, which.max)  # row values
+      return(nll.pwlin(psi=psi.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
+                       locs=locs, fW.fit=fW.fit, joint.fit=joint.fit, pos.par=TRUE,
+                       pen.const=pen.const,del.tri=del.tri))
 
-    max.df = data.frame(coord=c(1:num.cols),max=max.vals,loc=which.max.vals)
-    max.lst = lapply(1:nrow(locs),function(loc){
-      cond = max.df$loc==loc
-      if(all(cond==F)){
-        return(NULL)
-      } else {
-        return(list(loc=loc,
-                    val=max(max.df$max[cond])))
+    }
+    fixed.pars.idx = c()
+    is.bounded=F   # kind of like a dummy variable, will terminate the loop inside
+    while(!is.bounded){
+      # print(i)
+
+      # evaluate at nodes
+      unitg = locs/gfun.pwl(x=locs,par=mle,ref.angles=locs)#apply(locs,1,gfun.4d,par=mle,ref.angles=locs)  # need to round here
+
+      # what is max along nodes
+      max.vals = apply(unitg,2, max)
+      which.max.vals = apply(unitg,2, which.max)  # row values
+
+      max.df = data.frame(coord=c(1:num.cols),max=max.vals,loc=which.max.vals)
+      max.lst = lapply(1:nrow(locs),function(loc){
+        cond = max.df$loc==loc
+        if(all(cond==F)){
+          return(NULL)
+        } else {
+          return(list(loc=loc,
+                      val=max(max.df$max[cond])))
+        }
+      })
+      max.lst = max.lst[lapply(max.lst,length)>0]
+
+      if(all(round(max.vals,num.cols)==1)){
+        break  # algorithm complete, all comp. max. vals are 1
       }
-    })
-    max.lst = max.lst[lapply(max.lst,length)>0]
+      for(lst in max.lst){
+        fixed.pars.idx = unique(sort(c(fixed.pars.idx,lst$loc)))
+        mle[lst$loc] = mle[lst$loc]/lst$val
+      }
 
-    if(all(round(max.vals,num.cols)==1)){
-      break  # algorithm complete, all comp. max. vals are 1
-    }
-    for(lst in max.lst){
-      fixed.pars.idx = unique(sort(c(fixed.pars.idx,lst$loc)))
-      mle[lst$loc] = mle[lst$loc]/lst$val
+      if(nrow(locs)==length(fixed.pars.idx)){
+        break  # we fixed all the parameters
+      }
+
+      if(fixed.shape & !fW.fit & !joint.fit){
+        # fit the conditional radial model only
+        init.vals = init.val[-fixed.pars.idx]
+        # opt <- optim(lik.custom, par = init.vals, r = r,
+        #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+        #              fW.fit=F,joint.fit=F,pen.const=pen.const,del.tri=del.tri,
+        #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
+        #              control=list(maxit=1e6,reltol=1e-5),method=method,...)
+        opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                      fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                      fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
+        opt2$fW.par = NULL  # didn't model angles
+      } else if(fixed.shape & fW.fit & joint.fit){
+        # fit the radial model and angular model together
+        init.vals = init.val[-fixed.pars.idx]
+        # opt <- optim(lik.custom, par = init.vals, r = r,
+        #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+        #              fW.fit=T,joint.fit=T,pen.const=pen.const,del.tri=del.tri,
+        #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
+        #              control=list(maxit=1e6,reltol=1e-5),method=method,...)
+        opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                       fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                       fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
+        opt2$fW.par = opt2$mle
+      } else {
+        stop("ERROR in likelihood setup")
+      }
+      mle[-fixed.pars.idx] = opt2$mle
+      # i=i+1
     }
 
-    if(nrow(locs)==length(fixed.pars.idx)){
-      break  # we fixed all the parameters
-    }
+    t2 = Sys.time()
 
-    if(fixed.shape & !fW.fit & !joint.fit){
-      # fit the conditional radial model only
-      init.vals = init.val[-fixed.pars.idx]
-      opt <- optim(lik.custom, par = init.vals, r = r,
-                   r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
-                   fW.fit=F,joint.fit=F,pen.const=pen.const,del.tri=del.tri,
-                   fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
-                   control=list(maxit=1e6,reltol=1e-5),method=method,...)
-      opt$fW.par = NULL  # didn't model angles
-    } else if(fixed.shape & fW.fit & joint.fit){
-      # fit the radial model and angular model together
-      init.vals = init.val[-fixed.pars.idx]
-      opt <- optim(lik.custom, par = init.vals, r = r,
-                   r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
-                   fW.fit=T,joint.fit=T,pen.const=pen.const,del.tri=del.tri,
-                   fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
-                   control=list(maxit=1e6,reltol=1e-5),method=method,...)
-      opt$fW.par = opt$par
+    if(joint.fit){
+      fW.mle = mle
     } else {
-      stop("ERROR in likelihood setup")
+      fW.mle = NULL
     }
-    mle[-fixed.pars.idx] = opt$par
-    # i=i+1
+
+    return(list(mle = mle, fW.mle = fW.mle, shape=dim(w)[2],
+                nllh = NULL, convergence = opt2$conv,
+                aic = NULL, init.val = init.val,
+                info = t2-t1))
+  } else {
+    t2 = Sys.time()
+    opt$info = t2-t1
+    return(opt)
   }
-  return(list(mle=mle,
-              fixed.pars.idx=fixed.pars.idx))
+
+
+
+
+  # return(list(mle=mle,
+  #             fixed.pars.idx=fixed.pars.idx))
+
+  # t2 = Sys.time()
+
+  # return(list(mle = mle, fW.mle = opt$fW.par, shape=dim(w)[2],
+  #             nllh = opt$value, convergence = opt$conv,
+  #             aic = opt$aic, init.val = opt$init.val,
+  #             info = t2-t1))
 }
 

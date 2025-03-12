@@ -8,7 +8,7 @@ library(evd)
 library(mvtnorm)
 library(rgl)
 library(lattice)
-library(PWLExtremes)
+# library(PWLExtremes)
 
 usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
                    -0.09606559,-0.2029479,0.974465668,0,
@@ -16,10 +16,10 @@ usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
                    0,0,0,1)
                  ,4,4,byrow=T)
 
-# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
+fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
+invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
-# setwd("~/GitHub/PWLExtremes/example_code")
+setwd("~/GitHub/PWLExtremes/example_code")
 
 set.seed(4444)
 n = 5000  # generate n datapoints
@@ -100,11 +100,11 @@ for(i in 1:nrow(del.tri$tri)){
 }
 
 # fit the models
-model.fit.R.unbounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.003333333,method="BFGS")
-model.fit.R.bounded = bound.fit(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.003333333,method="BFGS")
-model.fit.W = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.2,fW.fit=T,method="BFGS")
-model.fit.RW.unbounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.003333333,method="BFGS",fW.fit=T,joint.fit=T)
-model.fit.RW.bounded = bound.fit(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.003333333,method="BFGS",fW.fit=T,joint.fit=T)
+model.fit.R.unbounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=FALSE)
+model.fit.R.bounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=TRUE)
+model.fit.W = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=2,fW.fit=T,method="BFGS")
+model.fit.RW.unbounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=FALSE,fW.fit=T,joint.fit=T)
+model.fit.RW.bounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=TRUE,fW.fit=T,joint.fit=T)
 
 # plot the unit level sets
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.unbounded$mle,ref.angles=par.locs)

@@ -6,10 +6,10 @@ library(geometry)
 library(geometricMVE)
 library(evd)
 library(mvtnorm)
-library(PWLExtremes)
+# library(PWLExtremes)
 
-# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
+fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
+invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
 setwd("~/GitHub/PWLExtremes/example_code")
 
@@ -52,11 +52,11 @@ lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
 
 # Fit the models
 par.locs = seq(0,1,length.out=11)
-model.fit.R.unbounded = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.0,method="BFGS")
-model.fit.R.bounded = bound.fit.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.04,method="BFGS")
-model.fit.W = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.5,fW.fit=T,method="BFGS")
-model.fit.RW.unbounded = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.04,method="BFGS",fW.fit=T,joint.fit=T)
-model.fit.RW.bounded = bound.fit.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.04,method="BFGS",fW.fit=T,joint.fit=T)
+model.fit.R.unbounded   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
+model.fit.R.bounded     = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
+model.fit.W             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=3,fW.fit=T,method="BFGS")
+model.fit.RW.unbounded  = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
+model.fit.RW.bounded    = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
 
 # plot the unit level sets
 par(mfrow=c(2,2),pty="s")
