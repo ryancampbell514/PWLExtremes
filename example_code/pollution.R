@@ -9,7 +9,7 @@ library(PWLExtremes)
 # fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
 # invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
-setwd("~/GitHub/PWLExtremes/example_code")
+# setwd("~/GitHub/PWLExtremes/example_code")
 
 load("~/GitHub/PWLExtremes/ds_4d_urban.Rdata")
 head(ds.exp.4d)

@@ -6,12 +6,12 @@ library(geometry)
 library(geometricMVE)
 library(evd)
 library(mvtnorm)
-# library(PWLExtremes)
+library(PWLExtremes)
 
-fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
+# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
+# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
 
-setwd("~/GitHub/PWLExtremes/example_code")
+# setwd("~/GitHub/PWLExtremes/example_code")
 
 set.seed(4444)
 n = 5000  # generate n datapoints

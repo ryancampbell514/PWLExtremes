@@ -79,7 +79,7 @@ nll.pwlin.2d = function(psi, r, r0w, w.adj.angles, locs, norm, marg, pen.norm , 
 opt.pwl.2d = function(NLL, r, r0w, w, locs,
                       init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
                       joint.fit=FALSE,method="BFGS",
-                      pen.const=0,pen.adj=FALSE,...){
+                      pen.const=0,pen.adj=FALSE,marg="pos",pen.norm="2",...){
   # w.adj.angles -> output of "which.adj.angles.2d"
 
   # if(is.null(init.val)){
@@ -145,9 +145,6 @@ fit.pwlin.2d = function(r,w,r0w,locs,
                      init.val=NULL,fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,
                      method="BFGS",pen.const=0,bound.fit=FALSE,
                      marg="pos",pen.norm="2",...){
-
-  ################# left off here 11-03-2025 ##################
-
 
   if(is.null(init.val)){
     init.val = rep(1,length(locs))
@@ -361,7 +358,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
                 fixed.pars.idx=NULL,
                 fW.mle = opt$fW.mle,
                 shape=2,
-                nll = opt$value,
+                nll = opt$nllh,
                 convergence = opt$conv,
                 init.val = init.val,
                 info=t2-t1))
