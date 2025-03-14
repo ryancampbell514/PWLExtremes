@@ -664,12 +664,14 @@ fit.pwlin = function(r,w,r0w,locs,
     }
 
     return(list(mle = mle, fW.mle = fW.mle, shape=dim(w)[2],
+                fixed.pars.idx=fixed.pars.idx
                 nllh = NULL, convergence = opt2$conv,
                 aic = NULL, init.val = init.val,
                 info = t2-t1))
   } else {
     t2 = Sys.time()
     opt$info = t2-t1
+    opt$fixed.pars.idx=NULL
     return(opt)
   }
 
