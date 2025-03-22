@@ -399,7 +399,10 @@ get_ref_angles = function(w, min.num = 30, gauss.corr=F){
     })
     # print(cbind(par.locs,numm))
     # print(numm)
-    which.rm = numm < min.num & c(1:nrow(par.locs)) > dd
+    # which.rm = numm < min.num & c(1:nrow(par.locs)) > dd
+    unique.min = min(unique(numm))
+    which.rm = (numm < min.num) & (c(1:nrow(par.locs)) > dd) & (numm == unique.min)
+
     par.locs.new = par.locs[!which.rm,]
     if(nrow(par.locs.new) == nrow(par.locs)){
       ord = order(numm)
@@ -415,29 +418,38 @@ get_ref_angles = function(w, min.num = 30, gauss.corr=F){
     par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
     par.locs = ifelse(par.locs<0,0,par.locs)
     par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
-
   }
-
 
   return(par.locs)
 }
 
-get_ref_angles_5d = function(w,min.num=50){
+get_ref_angles_5d = function(w,min.num=30,gauss.corr=F){
+
+  # testing version - ignore for now.
 
   dd = dim(w)[2]
 
   # define par.locs
   # load("parlocs.RData")
-  par.locs = rbind(diag(5),
-                   rep(1/5,5),
-                   c(1/4,1/4,1/4,1/4,0),c(1/4,1/4,1/4,0,1/4),c(1/4,1/4,0,1/4,1/4),c(1/4,0,1/4,1/4,1/4),c(0,1/4,1/4,1/4,1/4),
-                   c(1/3,1/3,1/3,0,0),c(1/3,1/3,0,1/3,0),c(1/3,0,1/3,1/3,0),c(0,1/3,1/3,1/3,0),
-                   c(1/3,1/3,0,0,1/3),c(1/3,0,1/3,0,1/3),c(0,1/3,1/3,0,1/3),
-                   c(1/3,0,0,1/3,1/3), c(0,1/3,0,1/3,1/3), c(0,0,1/3,1/3,1/3),
-                   c(0.5,0.5,0,0,0),c(0.5,0,0.5,0,0),c(0.5,0,0,0.5,0),c(0.5,0,0,0,0.5),
-                   c(0,0.5,0.5,0,0),c(0,0.5,0,0.5,0),c(0,0.5,0,0,0.5),
-                   c(0,0,0.5,0.5,0),c(0,0,0.5,0,0.5),c(0,0,0,0.5,0.5)
-  )
+  par.locs = expand.grid(replicate(dd-1, seq(0,1,by=0.1), simplify = FALSE))
+  par.locs = cbind(par.locs,1-apply(par.locs,1,sum))
+  par.locs[,dd] = round(par.locs[,dd],3)
+  par.locs = par.locs[par.locs[,dd]>=0,]
+  par.locs = data.frame(rbind(diag(dd),as.matrix(unname(par.locs))))
+  par.locs = as.matrix(unname(par.locs[!duplicated(par.locs),]))
+
+  # par.locs2 = rbind(diag(5),
+  #                  rep(1/5,5),
+  #                  c(1/4,1/4,1/4,1/4,0),c(1/4,1/4,1/4,0,1/4),c(1/4,1/4,0,1/4,1/4),c(1/4,0,1/4,1/4,1/4),c(0,1/4,1/4,1/4,1/4),
+  #                  c(1/3,1/3,1/3,0,0),c(1/3,1/3,0,1/3,0),c(1/3,0,1/3,1/3,0),c(0,1/3,1/3,1/3,0),
+  #                  c(1/3,1/3,0,0,1/3),c(1/3,0,1/3,0,1/3),c(0,1/3,1/3,0,1/3),
+  #                  c(1/3,0,0,1/3,1/3), c(0,1/3,0,1/3,1/3), c(0,0,1/3,1/3,1/3),
+  #                  c(0.5,0.5,0,0,0),c(0.5,0,0.5,0,0),c(0.5,0,0,0.5,0),c(0.5,0,0,0,0.5),
+  #                  c(0,0.5,0.5,0,0),c(0,0.5,0,0.5,0),c(0,0.5,0,0,0.5),
+  #                  c(0,0,0.5,0.5,0),c(0,0,0.5,0,0.5),c(0,0,0,0.5,0.5)
+  # )
+  # par.locs = rbind(diag(dd),par.locs)
+  # par.locs = as.matrix(unname(par.locs[!duplicated(data.frame(par.locs)),]))
 
   numm = rep(0,nrow(par.locs))
   while(any(numm < min.num)){
@@ -453,7 +465,8 @@ get_ref_angles_5d = function(w,min.num=50){
     })
     # print(cbind(par.locs,numm))
     # print(numm)
-    which.rm = numm < min.num & c(1:nrow(par.locs)) > dd
+    unique.min = min(unique(numm))
+    which.rm = (numm < min.num) & (c(1:nrow(par.locs)) > dd) & (numm == unique.min)
     par.locs.new = par.locs[!which.rm,]
     if(nrow(par.locs.new) == nrow(par.locs)){
       ord = order(numm)
@@ -465,13 +478,11 @@ get_ref_angles_5d = function(w,min.num=50){
 
   }
 
-  # if(gauss.corr){
-  #   par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
-  #   par.locs = ifelse(par.locs<0,0,par.locs)
-  #   par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
-  #
-  # }
-
+  if(gauss.corr){
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
+    par.locs = ifelse(par.locs<0,0,par.locs)
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
+  }
 
   return(par.locs)
 }

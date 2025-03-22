@@ -6,7 +6,12 @@ library(geometry)
 library(geometricMVE)
 library(evd)
 library(mvtnorm)
+library(this.path)
+
+setwd(this.path::here())
+
 library(PWLExtremes)
+source("~/GitHub/PWLExtremes/R/likelihoodandmodelfitting.R")
 
 # fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
 # invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
@@ -53,6 +58,7 @@ lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
 # Fit the models
 par.locs = seq(0,1,length.out=11)
 model.fit.R.unbounded   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
+model.fit.R.unbounded.pensearch   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F)
 model.fit.R.bounded     = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
 model.fit.W             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=3,fW.fit=T,method="BFGS")
 model.fit.RW.unbounded  = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
@@ -61,6 +67,7 @@ model.fit.RW.bounded    = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.c
 # plot the unit level sets
 par(mfrow=c(2,2),pty="s")
 plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.R.unbounded$mle,ref.angles=par.locs),type="l")
+plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.R.unbounded.pensearch$mle,ref.angles=par.locs),type="l")
 plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.R.bounded$mle,ref.angles=par.locs),type="l")
 plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.RW.unbounded$mle,ref.angles=par.locs),type="l")
 plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.RW.bounded$mle,ref.angles=par.locs),type="l")

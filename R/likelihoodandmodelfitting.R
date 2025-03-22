@@ -143,11 +143,17 @@ opt.pwl.2d = function(NLL, r, r0w, w, locs,
 # fit.pwlin.2d = function(r,w,r0w,locs,norm=NULL,marg="pos",pen.norm="2", init.val=NULL, pen.adj=F, fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,pen.const=0,method="BFGS",...){
 fit.pwlin.2d = function(r,w,r0w,locs,
                      init.val=NULL,fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,
-                     method="BFGS",pen.const=0,bound.fit=FALSE,
+                     method="BFGS",pen.const=NULL,bound.fit=FALSE,
                      marg="pos",pen.norm="2",...){
 
   if(is.null(init.val)){
     init.val = rep(1,length(locs))
+  }
+
+  if(is.null(pen.const)){
+    message("searching for gradient penalty constant...")
+    pen.const = get_pen_const_2d(r,w,r0w,locs,init.val,fW.fit,joint.fit)
+    message(paste("Fitting with gradient penalty strength",pen.const))
   }
 
   gfun=function(x,par) {gfun.2d(x,par,ref.angles=locs)}
@@ -347,6 +353,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
                 fixed.pars.idx=fixed.pars.idx,
                 fW.mle = fW.mle,
                 shape=2,
+                pen.const=pen.const,
                 nll = NULL,
                 convergence = opt2$conv,
                 init.val = init.val,
@@ -358,11 +365,68 @@ fit.pwlin.2d = function(r,w,r0w,locs,
                 fixed.pars.idx=NULL,
                 fW.mle = opt$fW.mle,
                 shape=2,
+                pen.const=pen.const,
                 nll = opt$nllh,
                 convergence = opt$conv,
                 init.val = init.val,
                 info=t2-t1))
   }
+}
+
+get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
+  if(fW.fit){
+    pen.consts = seq(0,30,length.out=100)
+  } else {
+    pen.consts = seq(0,4,length.out=100)
+  }
+
+  k.folds = 4
+  grps = sample(1:k.folds,length(rexc),replace=T)
+
+  pen.consts.scores = rep(NA,length(pen.consts))
+
+  iter=1
+  for(pen.const.idx in c(1:length(pen.consts))){
+
+    pen.const = pen.consts[pen.const.idx]
+    # pen.const.W = pen.consts.W[pen.const.idx]
+
+    # lik.scores.R13 = rep(NA,k.folds)
+
+    # for(K in 1:k.folds){
+    K = 1
+    r.fitting = r[grps!=K]
+    w.fitting = w[grps!=K]
+    r0w.fitting = r0w[grps!=K]
+    r.eval = r[grps==K]
+    w.eval = w[grps==K]
+    r0w.eval = r0w[grps==K]
+
+    is_error <- FALSE
+    tryCatch({
+      mod.fit = fit.pwlin.2d(r=r.fitting,r0w=r0w.fitting,w=w.fitting,
+                               locs=locs,pen.const=pen.const,method="BFGS",
+                               init.val=init.val,
+                             fW.fit=fW.fit,joint.fit=joint.fit,bound.fit=FALSE)
+    },error=function(e){
+      is_error <<- TRUE
+    })
+    if(is_error) {
+      print(pen.const)
+      pen.consts.scores[pen.const.idx] = 1e10
+      next
+    }
+
+    w.eval.adj.angles = which.adj.angles.2d(angles=w.eval,locs=locs)
+
+    pen.consts.scores[pen.const.idx] =
+      nll.pwlin.2d(psi=mod.fit$mle, r=r.eval, r0w=r0w.eval,
+                                     w.adj.angles=w.eval.adj.angles,
+                                     locs=locs,
+                                     norm="1", marg="pos",pen.norm=NULL, pen.adj=NULL,
+                                     fW.fit=fW.fit,joint.fit=joint.fit)
+  }
+  return(pen.consts[which.min(pen.consts.scores)])
 }
 
 ######################################################################

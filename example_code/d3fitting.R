@@ -82,6 +82,7 @@ par.locs = as.matrix(expand.grid(par.locs,par.locs))
 par.locs = cbind(par.locs,1-apply(par.locs,1,sum))
 par.locs = par.locs[apply(par.locs,1,function(w) !any(w<0)),]
 par.locs[,3] = ifelse(par.locs[,3]<0.001,0,par.locs[,3])
+# par.locs = get_ref_angles(wexc)
 
 # plot the Delaunay triangulation of the S_2 simplex
 par(pty="s",mfrow=c(1,1))#,mar=c(4,4,1,4))
@@ -110,6 +111,7 @@ model.fit.RW.bounded   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.unbounded$mle,ref.angles=par.locs)
 g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
 open3d()
+plot3d(x/log(n))
 surface3d(w.mesh[,1]/g.vals.mat,
           w.mesh[,2]/g.vals.mat,
           w.mesh[,3]/g.vals.mat,
