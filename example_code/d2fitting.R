@@ -60,7 +60,7 @@ par.locs = seq(0,1,length.out=11)
 model.fit.R.unbounded   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
 model.fit.R.unbounded.pensearch   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F)
 model.fit.R.bounded     = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
-model.fit.W             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=3,fW.fit=T,method="BFGS")
+model.fit.W             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,fW.fit=T,method="BFGS")
 model.fit.RW.unbounded  = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
 model.fit.RW.bounded    = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
 

@@ -152,7 +152,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
 
   if(is.null(pen.const)){
     message("searching for gradient penalty constant...")
-    pen.const = get_pen_const_2d(r,w,r0w,locs,init.val,fW.fit,joint.fit)
+    pen.const = get_pen_const_2d(r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit)
     message(paste("Fitting with gradient penalty strength",pen.const))
   }
 
@@ -374,7 +374,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
 }
 
 get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
-  if(fW.fit){
+  if(fW.fit & !joint.fit){
     pen.consts = seq(0,30,length.out=100)
   } else {
     pen.consts = seq(0,4,length.out=100)
@@ -419,8 +419,14 @@ get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
 
     w.eval.adj.angles = which.adj.angles.2d(angles=w.eval,locs=locs)
 
+    if(fW.fit & !joint.fit){
+      psi.vals = mod.fit$fW.mle
+    } else {
+      psi.vals = mod.fit$mle
+    }
+
     pen.consts.scores[pen.const.idx] =
-      nll.pwlin.2d(psi=mod.fit$mle, r=r.eval, r0w=r0w.eval,
+      nll.pwlin.2d(psi=psi.vals, r=r.eval, r0w=r0w.eval,
                                      w.adj.angles=w.eval.adj.angles,
                                      locs=locs,
                                      norm="1", marg="pos",pen.norm=NULL, pen.adj=NULL,
