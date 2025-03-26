@@ -381,7 +381,7 @@ get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
   }
 
   k.folds = 4
-  grps = sample(1:k.folds,length(rexc),replace=T)
+  grps = sample(1:k.folds,length(r),replace=T)
 
   pen.consts.scores = rep(NA,length(pen.consts))
 
@@ -412,7 +412,7 @@ get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
       is_error <<- TRUE
     })
     if(is_error) {
-      print(pen.const)
+      # print(pen.const)
       pen.consts.scores[pen.const.idx] = 1e10
       next
     }
@@ -613,7 +613,7 @@ opt.pwl = function(NLL, r, r0w, w, locs,
 
 fit.pwlin = function(r,w,r0w,locs,
                      init.val=NULL,fixed.shape=TRUE,fW.fit=FALSE,joint.fit=FALSE,
-                     method="BFGS",pen.const=0,bound.fit=FALSE,...){
+                     method="BFGS",pen.const=NULL,bound.fit=FALSE,...){
 
   if(fW.fit & !joint.fit & bound.fit){
     stop("No need to bound anglar parameters if not jointly fitting.")
@@ -623,6 +623,12 @@ fit.pwlin = function(r,w,r0w,locs,
 
   if(is.null(init.val)){
     init.val = rep(1,nrow(locs))
+  }
+
+  if(is.null(pen.const)){
+    message("searching for gradient penalty constant...")
+    pen.const = get_pen_const(r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit)
+    message(paste("Fitting with gradient penalty strength",pen.const))
   }
 
   num.cols = dim(w)[2]
@@ -734,19 +740,18 @@ fit.pwlin = function(r,w,r0w,locs,
     }
 
     return(list(mle = mle, fW.mle = fW.mle, shape=dim(w)[2],
+                pen.const=pen.const,
                 fixed.pars.idx=fixed.pars.idx,
                 nllh = NULL, convergence = opt2$conv,
                 aic = NULL, init.val = init.val,
                 info = t2-t1))
   } else {
     t2 = Sys.time()
+    opt$pen.const=pen.const
     opt$info = t2-t1
     opt$fixed.pars.idx=NULL
     return(opt)
   }
-
-
-
 
   # return(list(mle=mle,
   #             fixed.pars.idx=fixed.pars.idx))
@@ -757,5 +762,69 @@ fit.pwlin = function(r,w,r0w,locs,
   #             nllh = opt$value, convergence = opt$conv,
   #             aic = opt$aic, init.val = opt$init.val,
   #             info = t2-t1))
+}
+
+
+get_pen_const = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
+  if(fW.fit & !joint.fit){
+    pen.consts = seq(0,30,length.out=30)
+  } else {
+    pen.consts = seq(0,4,length.out=30)
+  }
+
+  k.folds = 4
+  grps = sample(1:k.folds,length(r),replace=T)
+
+  pen.consts.scores = rep(NA,length(pen.consts))
+
+  iter=1
+  for(pen.const.idx in c(1:length(pen.consts))){
+    # print(pen.consts.scores)
+
+
+    pen.const = pen.consts[pen.const.idx]
+    # pen.const.W = pen.consts.W[pen.const.idx]
+
+    # lik.scores.R13 = rep(NA,k.folds)
+
+    # for(K in 1:k.folds){
+    K = 1
+    r.fitting = r[grps!=K]
+    w.fitting = w[grps!=K,]
+    r0w.fitting = r0w[grps!=K]
+    r.eval = r[grps==K]
+    w.eval = w[grps==K,]
+    r0w.eval = r0w[grps==K]
+
+    is_error <- FALSE
+    tryCatch({
+      mod.fit = fit.pwlin(r=r.fitting,r0w=r0w.fitting,w=w.fitting,
+                             locs=locs,pen.const=pen.const,method="BFGS",
+                             init.val=init.val,
+                             fW.fit=fW.fit,joint.fit=joint.fit,bound.fit=FALSE)
+    },error=function(e){
+      is_error <<- TRUE
+    })
+    if(is_error) {
+      # print(pen.const)
+      pen.consts.scores[pen.const.idx] = 1e10
+      next
+    }
+
+    w.eval.adj.angles = which.adj.angles(angles=w.eval,locs=locs)
+
+    if(fW.fit & !joint.fit){
+      psi.vals = mod.fit$fW.mle
+    } else {
+      psi.vals = mod.fit$mle
+    }
+
+    pen.consts.scores[pen.const.idx] =
+      nll.pwlin(psi=psi.vals, r=r.eval, r0w=r0w.eval,
+                   w.adj.angles=w.eval.adj.angles,
+                   locs=locs,
+                   fW.fit=fW.fit,joint.fit=joint.fit)
+  }
+  return(pen.consts[which.min(pen.consts.scores)])
 }
 
