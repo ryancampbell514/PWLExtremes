@@ -160,7 +160,7 @@ sim.cond = function (w, r0w, k = 1, nsim, shape=NULL, par, gfun) {
   
   # WARNING: assumed fixed shape parameter
   if (k != 1) {
-    iw <- iweights.pwl(k = k, r0w = r0w, w = w, gfun = gfun, par = par)
+    iw <- iweights.pwl(k = k, r0w = r0w, w = w, gfun = gfun, par = par, shape=shape)
     star.ind <- sample(1:nrow(w), size = nsim, replace = T, prob = iw)
     wstar <- w[star.ind,]
     r0w_star <- c(k * r0w)[star.ind]
