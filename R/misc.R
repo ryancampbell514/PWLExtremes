@@ -231,6 +231,9 @@ which.adj.angles = function(angles,locs){
   if("data.frame" %in% class(angles)){
     angles=as.matrix(angles)
   }
+  if(is.null(dim(angles))){
+    angles=as.matrix(angles,nrow=1)
+  }
 
   num.cols = dim(locs)[2]
 
