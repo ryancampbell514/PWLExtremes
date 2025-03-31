@@ -232,7 +232,7 @@ which.adj.angles = function(angles,locs){
     angles=as.matrix(angles)
   }
   if(is.null(dim(angles))){
-    angles=as.matrix(angles,nrow=1)
+    angles=t(as.matrix(angles))
   }
 
   num.cols = dim(locs)[2]
