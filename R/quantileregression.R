@@ -121,8 +121,8 @@ get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
     r.eval = r[grps==K]
     w.eval = w[grps==K,]
 
-    # is_error <- FALSE
-    # tryCatch({
+    is_error <- FALSE
+    tryCatch({
       r0w.eval = apply(w.eval,1,function(wpts.i){
         if(sum(wpts.i)>1){
           return(NA)
@@ -140,14 +140,14 @@ get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
 
       check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
 
-    # },error=function(e){
-    #   is_error <<- TRUE
-    # })
-    # if(is_error) {
-    #   # print(pen.const)
-    #   check.scores[bww.idx] = 1e10
-    #   next
-    # }
+    },error=function(e){
+      is_error <<- TRUE
+    })
+    if(is_error) {
+      # print(pen.const)
+      check.scores[bww.idx] = 1e10
+      next
+    }
   }
   return(bww.vals[which.min(check.scores)])
 }
