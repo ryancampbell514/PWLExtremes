@@ -49,9 +49,9 @@ nll.pwlin.2d = function(psi, r, r0w, w.adj.angles, locs, norm, marg, pen.norm , 
     grad.g = norm.vecs / apply(scaled.locs.cart[-nrow(scaled.locs.cart),] * norm.vecs, 1,sum)  # gradient of g in each region (is constant/linear in each face)
     pen = apply(grad.g,2,diff)
     if(pen.norm=="2"){
-      pen = apply(pen,1,function(vec) mean(vec^2))  # used to be sum
+      pen = apply(pen,1,function(vec) sum(vec^2))  # mean or sum? Sum makes sense.
     } else if(pen.norm=="1"){
-      pen = apply(pen,1,function(vec) mean(abs(vec)))  # used to be sum
+      pen = apply(pen,1,function(vec) sum(abs(vec)))
     }
 
     if(pen.adj){
@@ -69,7 +69,7 @@ nll.pwlin.2d = function(psi, r, r0w, w.adj.angles, locs, norm, marg, pen.norm , 
       pen = pen/pen.multiplier
     }
 
-    pen = mean(pen)  # used to be sum
+    pen = mean(pen)  # used to be sum, but mean makes sense
     return(NLL+(pen.const*pen))
   } else {
     return(NLL)
@@ -479,29 +479,61 @@ pwl.L2.pen = function(psi,locs,del.tri){
     return(grad.g.val)
   })
   # pen = 0
-  idx.vecs = NULL
+  # idx.vecs = NULL
+  # for(i in 1:nrow(locs)){
+  #   which.has.i = apply(tri,1,function(ii){
+  #     i %in% ii
+  #   })
+  #   if(sum(which.has.i)==1){
+  #     next  # only 1 face, can't compare gradient to another
+  #   } else if(sum(which.has.i)>1){
+  #     which.grad.gs = (1:length(grad.g))[which.has.i]
+  #     idx.combs = combn(1:length(which.grad.gs),2)
+  #     idx.vec = do.call(rbind,lapply(1:ncol(idx.combs),function(i.col){
+  #       return(sort(which.grad.gs[idx.combs[,i.col]]))
+  #     }))
+  #     idx.vecs = rbind(idx.vecs,idx.vec)
+  #   }
+  # }
+  # idx.vecs = idx.vecs[!duplicated(idx.vecs), ]
+  # grad.g.mat = do.call(rbind,grad.g)
+  # pen = apply(idx.vecs,1,function(ii){
+  #   # print(ii)
+  #   pp = diff(grad.g.mat[ii,])
+  #   # print(pp)
+  #   # print("")
+  #   return(sum(pp^2))  # should this be "mean" or "sum"? sum is the 2-norm of the differences in gradient
+  # })
+  # return(mean(pen))   # should this be "mean" or "sum"?
+
+  # idx.vecs = NULL
+  pen = NULL
+  grad.g.mat = do.call(rbind,grad.g)
   for(i in 1:nrow(locs)){
+    #i=20
+    # which triangle has location "i" as a vertex?
     which.has.i = apply(tri,1,function(ii){
       i %in% ii
     })
     if(sum(which.has.i)==1){
-      next  # only 1 face, can't compare gradient to another
+      # only 1 face, can't compare gradient to another
+      next
     } else if(sum(which.has.i)>1){
-      which.grad.gs = (1:length(grad.g))[which.has.i]
-      idx.combs = combn(1:length(which.grad.gs),2)
-      idx.vec = do.call(rbind,lapply(1:ncol(idx.combs),function(i.col){
-        return(sort(which.grad.gs[idx.combs[,i.col]]))
-      }))
-      idx.vecs = rbind(idx.vecs,idx.vec)
+      # which.grad.gs = (1:length(grad.g))[which.has.i]
+      idx.combs = combn(1:sum(which.has.i),2)
+      diffs = NULL
+      for(jk.idx in 1:ncol(idx.combs)){
+        j = idx.combs[1,jk.idx]
+        k = idx.combs[2,jk.idx]
+        if(sum(table(c(tri[which.has.i,][j,],tri[which.has.i,][k,]))==2)==(num.cols-1)){  # need d-1 common vertices/reference angles
+          diffs = rbind(diffs,diff(grad.g.mat[which.has.i,][c(j,k),]))
+        }
+      }
+      pen.val.i = mean(apply(diffs^2,1,sum)) # sum of squared differences between adjacent gradients
+      pen = c(pen,pen.val.i)
     }
   }
-  idx.vecs = idx.vecs[!duplicated(idx.vecs), ]
-  grad.g.mat = do.call(rbind,grad.g)
-  pen = apply(idx.vecs,1,function(ii){
-    pp = diff(grad.g.mat[ii,])
-    return(mean(pp^2))  # used to be sum
-  })
-  return(mean(pen))   # used to be sum
+  return(mean(pen))   # should this be "mean" or "sum"?
 }
 
 nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
