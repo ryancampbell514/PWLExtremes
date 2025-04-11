@@ -200,9 +200,11 @@ radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
 
     return(list(wpts=wpts,
                 r.tau.wpts=r.tau.wpts,
-                r0w=r0w))
+                r0w=r0w,
+                bww=bww))
   } else {
-    return(list(r0w=r0w))
+    return(list(r0w=r0w,
+                bww=bww))
   }
 }
 
@@ -255,9 +257,11 @@ radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
 
     return(list(wpts=cbind(wpts,1-apply(wpts,1,sum)),
                 r.tau.wpts=r.tau.wpts,
-                r0w=r0w))
+                r0w=r0w,
+                bww=bww))
   } else {
-    return(list(r0w=r0w))
+    return(list(r0w=r0w,
+                bww=bww))
   }
 }
 
