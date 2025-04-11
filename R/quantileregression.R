@@ -29,7 +29,7 @@ mv.ker.pdf = function(x,mean,sd,ker.pdf){
 
   x = x[,-ncol(x)]
   mean = mean[-length(mean)]
-  
+
   val = lapply(1:nrow(x),function(row) prod(ker.pdf(x=x[row,],mean=mean,sd=sd),na.rm=T))
   val = unlist(val)
 
@@ -37,6 +37,119 @@ mv.ker.pdf = function(x,mean,sd,ker.pdf){
 }
 
 ###############################
+
+get_bww.2d = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
+
+  bww.vals = seq(0,0.2,length.out=20)[-1]  # don't think we can have a bandwidth of zero
+
+  k.folds = 4
+  grps = sample(1:k.folds,length(r),replace=T)
+
+  check.scores = rep(NA,length(bww.vals))
+
+  iter=1
+  for(bww.idx in c(1:length(bww.vals))){
+
+    bww = bww.vals[bww.idx]
+    # pen.const.W = pen.consts.W[pen.const.idx]
+
+    # lik.scores.R13 = rep(NA,k.folds)
+
+    # for(K in 1:k.folds){
+    K = 1
+    r.fitting = r[grps!=K]
+    w.fitting = w[grps!=K]
+    r.eval = r[grps==K]
+    w.eval = w[grps==K]
+
+    is_error <- FALSE
+    tryCatch({
+      r0w.eval = sapply(w.eval,function(wpts.i){
+        weightsw<-ker.pdf(w.fitting,mean=wpts.i,sd=bww)
+        pos.weights = weightsw>0
+        weightsw = weightsw[pos.weights]
+        ccdf<-function(rc){
+          ker.vals = ker.cdf(rc,mean=r.fitting,sd=bwr)[pos.weights]
+          num = weightsw*ker.vals
+          denom = weightsw
+          # print(num)
+          # print(denom)
+          sum(num,na.rm=T)/sum(denom,na.rm=T)
+        }
+        dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
+        ur<-uniroot(dummy,interval = c(0,30))
+        return(ur$root)
+      })
+
+      check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
+
+    },error=function(e){
+      is_error <<- TRUE
+    })
+    if(is_error) {
+      # print(pen.const)
+      check.scores[bww.idx] = 1e10
+      next
+    }
+  }
+  return(bww[which.min(check.scores)])
+}
+
+get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
+
+  bww.vals = seq(0,0.2,length.out=20)[-1]
+
+  k.folds = 4
+  grps = sample(1:k.folds,length(r),replace=T)
+
+  check.scores = rep(NA,length(bww.vals))
+
+  iter=1
+  for(bww.idx in c(1:length(bww.vals))){
+
+    bww = bww.vals[bww.idx]
+    # pen.const.W = pen.consts.W[pen.const.idx]
+
+    # lik.scores.R13 = rep(NA,k.folds)
+
+    # for(K in 1:k.folds){
+    K = 1
+    r.fitting = r[grps!=K]
+    w.fitting = w[grps!=K,]
+    r.eval = r[grps==K]
+    w.eval = w[grps==K,]
+
+    is_error <- FALSE
+    tryCatch({
+      r0w.eval = apply(w.eval,1,function(wpts.i){
+        if(sum(wpts.i)>1){
+          return(NA)
+        } else{
+          weightsw = dmvnorm(w.fitting[,-num.cols],mean=wpts.i[-num.cols],sigma=(bww^2)*diag(num.cols-1))
+
+          ccdf<-function(rc){
+            mean(weightsw*Gaussian.ker.cdf(rc,mean=r.fitting,sd=bwr))/mean(weightsw)
+          }
+          dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
+          ur<-uniroot(dummy,interval = c(0,30))
+          return(ur$root)
+        }
+      })
+
+      check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
+
+    },error=function(e){
+      is_error <<- TRUE
+    })
+    if(is_error) {
+      # print(pen.const)
+      check.scores[bww.idx] = 1e10
+      next
+    }
+  }
+  return(bww[which.min(check.scores)])
+}
+
 
 # kernel density estimation of the cdf when angles are defined by the L1-norm, then invert it
 radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
@@ -46,10 +159,16 @@ radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
   # bww, bwr          -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
   # n.mesh            -> mesh for wpts
   # ker.pdf, ker.cdf  -> kernel pdf and cdf functions
-  
+
+  if(is.null(bww)){
+    message("searching for optimal angular bandwidth for KDE threshold...")
+    bww = get_bww.2d(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
+    message(paste("Fitting threshold at angular bandwidth",bww))
+  }
+
   r0w = sapply(w, function(ww){
     weightsw<-ker.pdf(w,mean=ww,sd=bww)
-    
+
     ccdf<-function(rc){
       mean(weightsw*ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
     }
@@ -57,7 +176,7 @@ radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
     ur<-uniroot(dummy,interval = c(0,30))
     return(ur$root)
   })
-  
+
   if(mesh.eval){
     wpts<-seq(0,1,len=n.mesh)
     r.tau.wpts = sapply(wpts,function(wpts.i){
@@ -76,7 +195,7 @@ radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
       ur<-uniroot(dummy,interval = c(0,30))
       return(ur$root)
     })
-    
+
     return(list(wpts=wpts,
                 r.tau.wpts=r.tau.wpts,
                 r0w=r0w))
@@ -85,20 +204,28 @@ radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
   }
 }
 
+
+
 ## General d-dimensional version of QR
 radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
                         mesh.eval=TRUE, ker.pdf=mv.Gaussian.ker.pdf, ker.cdf=Gaussian.ker.cdf){
   require(mvtnorm)
   # r, w      -> vector and matrix, angles defined by the L1 norm
   # bww, bwr  -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
-  
+
+  if(is.null(bww)){
+    message("searching for optimal angular bandwidth for KDE threshold...")
+    bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
+    message(paste("Fitting threshold at angular bandwidth",bww))
+  }
+
   num.cols = dim(w)[2]
-  
+
   r0w = apply(w, 1, function(ww){
-    
+
     # weightsw = dmvnorm(w[,-num.cols],mean=ww[-num.cols],sigma=(bww^2)*diag(num.cols-1))
     weightsw = ker.pdf(x=w[,-num.cols], mean=ww[-num.cols], sd=bww)
-    
+
     ccdf<-function(rc){
       mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
     }
@@ -106,7 +233,7 @@ radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
     ur<-uniroot(dummy,interval = c(0,30))
     return(ur$root)
   })
-  
+
   if(mesh.eval){
     wpts<-expand.grid(replicate(num.cols-1, seq(0,1,len=n.mesh), simplify = FALSE))#expand.grid(seq(0,1,len=n.mesh),seq(0,1,len=n.mesh),seq(0,1,len=n.mesh),seq(0,1,len=n.mesh))
     r.tau.wpts = apply(wpts,1,function(wpts.i){
@@ -114,7 +241,7 @@ radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
         return(NA)
       } else{
         weightsw = dmvnorm(w[,-num.cols],mean=wpts.i[-num.cols],sigma=(bww^2)*diag(num.cols-1))
-        
+
         ccdf<-function(rc){
           mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
         }
@@ -123,7 +250,7 @@ radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
         return(ur$root)
       }
     })
-    
+
     return(list(wpts=cbind(wpts,1-apply(wpts,1,sum)),
                 r.tau.wpts=r.tau.wpts,
                 r0w=r0w))
@@ -144,22 +271,22 @@ quant.score.2d.checkfn = function(smoothness.lvl,w,r,tau=0.95,k.folds=5,method=c
   # r,w -> vectors, defined by L1 norm
   # tau -> the quantile
   # r0w -> the tau thrshold value at w
-  
+
   if(min(w)<0 | max(w)>1){
     stop("angles should be on the L1 Simplex.")
   }
-  
+
   # w.mesh = seq(0,1,length.out=nbins)
-  
+
   grps = sample(1:k.folds,length(r),replace=T)
-  
+
   score = mean(sapply(1:k.folds,function(K){
     # split data
     r.fitting = r[grps!=K]
     w.fitting = w[grps!=K]
     r.eval = r[grps==K]
     w.eval = w[grps==K]
-    
+
     # fit the quantile estimates
     if(method=="KDE"){
       r0w.eval = KDE.quant.eval.2d(wpts=w.eval,r=r.fitting,w=w.fitting,tau=tau,bww=smoothness.lvl,bwr=0.05,...)
@@ -167,15 +294,15 @@ quant.score.2d.checkfn = function(smoothness.lvl,w,r,tau=0.95,k.folds=5,method=c
       r0w.eval = empiricalQR.2d.v2(r.fitting=r.fitting,w.fitting=w.fitting,w.eval=w.eval,
                                    tau=tau,wqg=smoothness.lvl)$r.tau.wpts
     }
-    
+
     # k-th score accross bins
     score.K = checkfn(quant=tau,r.eval-r0w.eval)
     return(mean(score.K,na.rm=T))
-    
+
   }),na.rm=T)
-  
+
   return(score)
-  
+
 }
 
 quant.score.2d.checkfn.hR = function(smoothness.lvl,w,r,tau=0.95,k.folds=5,method=c("empirical","KDE"),...){
@@ -183,20 +310,20 @@ quant.score.2d.checkfn.hR = function(smoothness.lvl,w,r,tau=0.95,k.folds=5,metho
   # r,w -> vectors, defined by L1 norm
   # tau -> the quantile
   # r0w -> the tau thrshold value at w
-  
+
   if(min(w)<0 | max(w)>1){
     stop("angles should be on the L1 Simplex.")
   }
-  
+
   grps = sample(1:k.folds,length(r),replace=T)
-  
+
   score = mean(sapply(1:k.folds,function(K){
     # split data
     r.fitting = r[grps!=K]
     w.fitting = w[grps!=K]
     r.eval = r[grps==K]
     w.eval = w[grps==K]
-    
+
     # fit the quantile estimates
     if(method=="KDE"){
       r0w.eval = KDE.quant.eval.2d(wpts=w.eval,r=r.fitting,w=w.fitting,tau=tau,bww=0.05,bwr=smoothness.lvl,...)
@@ -204,31 +331,31 @@ quant.score.2d.checkfn.hR = function(smoothness.lvl,w,r,tau=0.95,k.folds=5,metho
       r0w.eval = empiricalQR.2d.v2(r.fitting=r.fitting,w.fitting=w.fitting,w.eval=w.eval,
                                    tau=tau,wqg=smoothness.lvl)$r.tau.wpts
     }
-    
+
     # k-th score accross bins
     score.K = checkfn(quant=tau,r.eval-r0w.eval)
     return(mean(score.K,na.rm=T))
-    
+
   }),na.rm=T)
-  
+
   return(score)
-  
+
 }
 
 quant.score.checkfn = function(smoothness.lvl,w,r,tau,k.folds=5,method="KDE"){
   # r,w -> vector and matrix, defined by L1 norm
   # tau -> the quantile
   # r0w -> the tau thrshold value at w
-  
+
   grps = sample(1:k.folds,length(r),replace=T)
-  
+
   score = mean(sapply(1:k.folds,function(K){
     # split data
     r.fitting = r[grps!=K]
     w.fitting = w[grps!=K,]
     r.eval = r[grps==K]
     w.eval = w[grps==K,]
-    
+
     # fit the quantile estimates
     if(method=="KDE"){
       r0w.eval = KDE.quant.eval(wpts=w.eval,r=r.fitting,w=w.fitting,tau=tau,bww=smoothness.lvl,bwr=0.05)
@@ -238,7 +365,7 @@ quant.score.checkfn = function(smoothness.lvl,w,r,tau,k.folds=5,method="KDE"){
     score.K = checkfn(quant=tau,r.eval-r0w.eval)
     return(mean(score.K,na.rm=T))
   }),na.rm=T)
-  
+
   return(score)
 }
 
@@ -251,7 +378,13 @@ KDE.quant.eval.2d = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,ker="Gaussian")
   # bww, bwr          -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
   # n.mesh            -> mesh for wpts
   # ker.pdf, ker.cdf  -> kernel pdf and cdf functions
-  
+
+  if(is.null(bww)){
+    message("searching for optimal angular bandwidth for KDE threshold...")
+    bww = get_bww.2d(r=r,w=w,tau=tau,bwr=bwr)
+    message(paste("Fitting threshold at angular bandwidth",bww))
+  }
+
   r.tau.wpts = sapply(wpts,function(wpts.i){
     if(ker=="Gaussian"){
       weightsw<-Gaussian.ker.pdf(w,mean=wpts.i,sd=bww)
@@ -274,9 +407,9 @@ KDE.quant.eval.2d = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,ker="Gaussian")
         sum(num,na.rm=T)/sum(denom,na.rm=T)
       }
     }
-    
+
     dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
-    
+
     is_error <- FALSE
     tryCatch({
       ur<-uniroot(dummy,interval = c(0,30))$root
@@ -288,16 +421,22 @@ KDE.quant.eval.2d = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,ker="Gaussian")
     }
     return(ur)
   })
-    
+
   return(r.tau.wpts)
 }
 
 KDE.quant.eval = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,
                           ker.pdf=mv.Gaussian.ker.pdf,ker.cdf=Gaussian.ker.cdf){
   require(mvtnorm)
-  
+
+  if(is.null(bww)){
+    message("searching for optimal angular bandwidth for KDE threshold...")
+    bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
+    message(paste("Fitting threshold at angular bandwidth",bww))
+  }
+
   n.dims = dim(w)[2]
-  
+
   r.tau.wpts = apply(wpts,1,function(wpts.i){
     if(sum(wpts.i)>1){
       return(NA)
@@ -327,26 +466,26 @@ KDE.quant.eval = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,
 # empirical QR, fitted on 1 dataset, evaluated on another
 # Also improved the notion of bin overlap
 
-empiricalQR.2d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J = 60, wqg = 1/60, 
-                              quantilespacing = FALSE) 
+empiricalQR.2d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J = 60, wqg = 1/60,
+                              quantilespacing = FALSE)
 {
-  
+
   if(wqg<(1/J)){
     stop("Need wqg > 1/J")
   }
   wsl <- seq(0, 1 - wqg, len = J)
   wsu <- seq(wqg, 1, len = J)
-  
+
   qu.r <- NULL
   for (j in 1:J) {
     re <- r.fitting[wsl[j] < w.fitting & w.fitting < wsu[j]]
     qu.r[j] <- quantile(re, tau)
   }
-  
+
   if(is.null(w.eval)){
     n.mesh=200
     w.eval=seq(0,1,length.out=n.mesh)
-  } 
+  }
   n <- length(w.eval)
   r0w <- numeric(n)
   for (i in 1:n) {
@@ -364,18 +503,18 @@ empiricalQR.3d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
                               mesh.eval=FALSE) {
   w1.fitting = w.fitting[, 1]
   w2.fitting = w.fitting[, 2]
-  
+
   if(wg<(1/J)){
     stop("Need wg > 1/J")
   }
   wsl <- seq(0, 1 - wg, len = J)
   wsu <- seq(wg, 1, len = J)
-  
+
   # empt=0
   qu.r <- matrix(0, J, J)
   for (j in 1:J) {
     for (k in 1:J) {
-      ind <- wsl[j] < w1.fitting & w1.fitting < wsu[j] & wsl[k] < w2.fitting & 
+      ind <- wsl[j] < w1.fitting & w1.fitting < wsu[j] & wsl[k] < w2.fitting &
         w2.fitting < wsu[k]
       r1 <- r.fitting[ind]
       if (sum(ind) > 10) {
@@ -388,7 +527,7 @@ empiricalQR.3d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
       }
     }
   }
-  
+
   if(is.null(w.eval)){
     n.mesh=100
     w.eval=expand.grid(seq(0,1,len=n.mesh),seq(0,1,len=n.mesh))
@@ -401,7 +540,7 @@ empiricalQR.3d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
     indMat <- matrix(NA, J, J)
     for (j in 1:J) {
       for (k in 1:J) {
-        indMat[j, k] <- wsl[j] < w1.eval[i] & w1.eval[i] < wsu[j] & 
+        indMat[j, k] <- wsl[j] < w1.eval[i] & w1.eval[i] < wsu[j] &
           wsl[k] < w2.eval[i] & w2.eval[i] < wsu[k]
       }
     }
@@ -412,23 +551,23 @@ empiricalQR.3d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
 }
 
 empiricalQR.4d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J = 20, wg = 1/20,
-                              mesh.eval=FALSE) 
+                              mesh.eval=FALSE)
 {
   w1.fitting = w.fitting[, 1]
   w2.fitting = w.fitting[, 2]
   w3.fitting = w.fitting[, 3]
-  
+
   if(wg<(1/J)){
     stop("Need wg > 1/J")
   }
   wsl <- seq(0, 1 - wg, len = J)
   wsu <- seq(wg, 1, len = J)
-  
+
   qu.r <- array(0, dim = c(J, J, J))
   for (j in 1:J) {
     for (k in 1:J) {
       for (l in 1:J) {
-        ind <- wsl[j] < w1.fitting & w1.fitting < wsu[j] & wsl[k] < 
+        ind <- wsl[j] < w1.fitting & w1.fitting < wsu[j] & wsl[k] <
           w2.fitting & w2.fitting < wsu[k] & wsl[l] < w3.fitting & w3.fitting < wsu[l]
         r1 <- r.fitting[ind]
         if (sum(ind) > 10) {
@@ -440,12 +579,12 @@ empiricalQR.4d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
       }
     }
   }
-  
-  
+
+
   if(is.null(w.eval)){
     n.mesh=30
     w.eval=expand.grid(seq(0,1,len=n.mesh),seq(0,1,len=n.mesh),seq(0,1,len=n.mesh))
-  } 
+  }
   w1.eval = w.eval[, 1]
   w2.eval = w.eval[, 2]
   w3.eval = w.eval[, 3]
@@ -456,8 +595,8 @@ empiricalQR.4d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
     for (j in 1:J) {
       for (k in 1:J) {
         for (l in 1:J) {
-          indArray[j, k, l] <- wsl[j] < w1.eval[i] & w1.eval[i] < 
-            wsu[j] & wsl[k] < w2.eval[i] & w2.eval[i] < wsu[k] & 
+          indArray[j, k, l] <- wsl[j] < w1.eval[i] & w1.eval[i] <
+            wsu[j] & wsl[k] < w2.eval[i] & w2.eval[i] < wsu[k] &
             wsl[l] < w3.eval[i] & w3.eval[i] < wsu[l]
         }
       }
@@ -469,30 +608,30 @@ empiricalQR.4d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
 }
 
 empiricalQR.5d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J = 10, wg = 0.15,
-                              mesh.eval=FALSE) 
+                              mesh.eval=FALSE)
 {
   w1.fitting = w.fitting[, 1]
   w2.fitting = w.fitting[, 2]
   w3.fitting = w.fitting[, 3]
   w4.fitting = w.fitting[, 4]
-  
+
   if(wg<(1/J)){
     stop("Need wg > 1/J")
   }
-  
+
   # J=3;wg=0.4
-  
+
   wsl <- seq(0, 1 - wg, len = J)
   wsu <- seq(wg, 1, len = J)
-  
+
   qu.r <- array(0, dim = c(J, J, J, J))
   for (j in 1:J) {
     for (k in 1:J) {
       for (l in 1:J) {
         for(m in 1:J) {
-          ind <- (wsl[j] < w1.fitting) & (w1.fitting < wsu[j]) & 
-            (wsl[k] < w2.fitting) &( w2.fitting < wsu[k]) & 
-            (wsl[l] < w3.fitting) &( w3.fitting < wsu[l]) & 
+          ind <- (wsl[j] < w1.fitting) & (w1.fitting < wsu[j]) &
+            (wsl[k] < w2.fitting) &( w2.fitting < wsu[k]) &
+            (wsl[l] < w3.fitting) &( w3.fitting < wsu[l]) &
             (wsl[m] < w4.fitting) & (w4.fitting < wsu[m])
           # print(c(,sum(ind)))
           # print(ind)
@@ -507,17 +646,17 @@ empiricalQR.5d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
       }
     }
   }
-  
-  
+
+
   if(is.null(w.eval)){
     n.mesh=30
     w.eval=expand.grid(seq(0,1,len=n.mesh),seq(0,1,len=n.mesh),seq(0,1,len=n.mesh))
-  } 
+  }
   w1.eval = w.eval[, 1]
   w2.eval = w.eval[, 2]
   w3.eval = w.eval[, 3]
   w4.eval = w.eval[, 4]
-  
+
   n <- length(w1.eval)
   r0w <- numeric(n)
   for (i in 1:n) {
@@ -526,9 +665,9 @@ empiricalQR.5d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
       for (k in 1:J) {
         for (l in 1:J) {
           for (m in 1:J) {
-            indArray[j, k, l, m] <- 
-              wsl[j] < w1.eval[i] & w1.eval[i] < wsu[j] & 
-              wsl[k] < w2.eval[i] & w2.eval[i] < wsu[k] & 
+            indArray[j, k, l, m] <-
+              wsl[j] < w1.eval[i] & w1.eval[i] < wsu[j] &
+              wsl[k] < w2.eval[i] & w2.eval[i] < wsu[k] &
               wsl[l] < w3.eval[i] & w3.eval[i] < wsu[l] &
               wsl[m] < w4.eval[i] & w4.eval[i] < wsu[m]
           }
@@ -537,7 +676,7 @@ empiricalQR.5d.v2 = function (r.fitting, w.fitting, w.eval=NULL, tau = 0.95, J =
     }
     r0w[i] <- mean(qu.r[indArray], na.rm = T)
   }
-  
+
   return(list(r0w=r0w))
   # return(list(wpts = w.eval, r.tau.wpts = r0w))
 }
