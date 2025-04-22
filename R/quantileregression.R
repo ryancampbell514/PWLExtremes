@@ -27,8 +27,8 @@ Epanechnikov.ker.cdf = function(x,mean,sd){
 # UNIVARIATE COPULA DENSITY (for wweights)
 mv.ker.pdf = function(x,mean,sd,ker.pdf){
 
-  x = x[,-ncol(x)]
-  mean = mean[-length(mean)]
+  # x = x
+  # mean = mean
 
   val = lapply(1:nrow(x),function(row) prod(ker.pdf(x=x[row,],mean=mean,sd=sd),na.rm=T))
   val = unlist(val)
@@ -38,7 +38,15 @@ mv.ker.pdf = function(x,mean,sd,ker.pdf){
 
 ###############################
 
-get_bww.2d = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
+get_bww.2d = function(r=r,w=w,tau=tau,bwr=bwr,ker=c("Gaussian","Epanechnikov")){
+
+  if(ker=="Gaussian"){
+    ker.pdf = Gaussian.ker.pdf
+    ker.cdf = Gaussian.ker.cdf
+  } else if(ker=="Epanechnikov"){
+    ker.pdf = Epanechnikov.ker.pdf
+    ker.cdf = Epanechnikov.ker.cdf
+  }
 
   bww.vals = seq(0,0.2,length.out=20)[-1]  # don't think we can have a bandwidth of zero
 
@@ -54,50 +62,51 @@ get_bww.2d = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
     # pen.const.W = pen.consts.W[pen.const.idx]
 
     # lik.scores.R13 = rep(NA,k.folds)
+    check.score = c()
+    for(K in 1:k.folds){
+      # K = 1
+      r.fitting = r[grps!=K]
+      w.fitting = w[grps!=K]
+      r.eval = r[grps==K]
+      w.eval = w[grps==K]
 
-    # for(K in 1:k.folds){
-    K = 1
-    r.fitting = r[grps!=K]
-    w.fitting = w[grps!=K]
-    r.eval = r[grps==K]
-    w.eval = w[grps==K]
-
-    is_error <- FALSE
-    tryCatch({
-      r0w.eval = sapply(w.eval,function(wpts.i){
-        weightsw<-ker.pdf(w.fitting,mean=wpts.i,sd=bww)
-        pos.weights = weightsw>0
-        weightsw = weightsw[pos.weights]
-        ccdf<-function(rc){
-          ker.vals = ker.cdf(rc,mean=r.fitting,sd=bwr)[pos.weights]
-          num = weightsw*ker.vals
-          denom = weightsw
-          # print(num)
-          # print(denom)
-          sum(num,na.rm=T)/sum(denom,na.rm=T)
-        }
-        dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
-        ur<-uniroot(dummy,interval = c(0,30))
-        return(ur$root)
+      is_error <- FALSE
+      tryCatch({
+        r0w.eval = sapply(w.eval,function(wpts.i){
+          weightsw<-ker.pdf(w.fitting,mean=wpts.i,sd=bww)
+          pos.weights = weightsw>0
+          weightsw = weightsw[pos.weights]
+          ccdf<-function(rc){
+            ker.vals = ker.cdf(rc,mean=r.fitting,sd=bwr)[pos.weights]
+            num = weightsw*ker.vals
+            denom = weightsw
+            # print(num)
+            # print(denom)
+            sum(num,na.rm=T)/sum(denom,na.rm=T)
+          }
+          dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
+          ur<-uniroot(dummy,interval = c(0,30))
+          return(ur$root)
+        })
+        # check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
+        check.score = c(check.score,mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T))
+      },error=function(e){
+        is_error <<- TRUE
       })
-
-      check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
-
-    },error=function(e){
-      is_error <<- TRUE
-    })
-    if(is_error) {
-      # print(pen.const)
-      check.scores[bww.idx] = 1e10
-      next
+      if(is_error) {
+        # print(pen.const)
+        # check.scores[bww.idx] = 1e10
+        next
+      }
     }
+    check.scores[bww.idx] = (1/k.folds)*sum(check.score, na.rm=T)
   }
   return(bww.vals[which.min(check.scores)])
 }
 
-get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
+get_bww = function(r=r,w=w,tau=tau,bwr=bwr,,ker=c("Gaussian","Epanechnikov")){
 
-  bww.vals = seq(0,0.2,length.out=20)[-1]
+  bww.vals = seq(0,0.2,length.out=10)[-1]
 
   k.folds = 4
   grps = sample(1:k.folds,length(r),replace=T)
@@ -114,40 +123,54 @@ get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
 
     # lik.scores.R13 = rep(NA,k.folds)
 
-    # for(K in 1:k.folds){
-    K = 1
-    r.fitting = r[grps!=K]
-    w.fitting = w[grps!=K,]
-    r.eval = r[grps==K]
-    w.eval = w[grps==K,]
+    check.score = c()
+    for(K in 1:k.folds){
+      # K = 1
+      r.fitting = r[grps!=K]
+      w.fitting = w[grps!=K,]
+      r.eval = r[grps==K]
+      w.eval = w[grps==K,]
 
-    is_error <- FALSE
-    tryCatch({
-      r0w.eval = apply(w.eval,1,function(wpts.i){
-        if(sum(wpts.i)>1){
-          return(NA)
-        } else{
-          weightsw = dmvnorm(w.fitting[,-num.cols],mean=wpts.i[-num.cols],sigma=(bww^2)*diag(num.cols-1))
+      is_error <- FALSE
+      tryCatch({
+        r0w.eval = apply(w.eval,1,function(wpts.i){
+          if(sum(wpts.i)>1){
+            return(NA)
+          } else{
+            if(ker=="Gaussian"){
+              weightsw = dmvnorm(w.fitting[,-num.cols],mean=wpts.i[-num.cols],sigma=(bww^2)*diag(num.cols-1))
+            } else if(ker=="Epanechnikov"){
+              weightsw = mv.ker.pdf(x=w.fitting[,-num.cols], mean=wpts.i[-num.cols], sd=bww,ker.pdf=Epanechnikov.ker.pdf)
+            }
+            # weightsw = dmvnorm(w.fitting[,-num.cols],mean=wpts.i[-num.cols],sigma=(bww^2)*diag(num.cols-1))
 
-          ccdf<-function(rc){
-            mean(weightsw*Gaussian.ker.cdf(rc,mean=r.fitting,sd=bwr))/mean(weightsw)
+            ccdf<-function(rc){
+              if(ker=="Gaussian"){
+                mean(weightsw*Gaussian.ker.cdf(rc,mean=r.fitting,sd=bwr))/mean(weightsw)
+              } else if(ker=="Epanechnikov"){
+                mean(weightsw*Epanechnikov.ker.cdf(rc,mean=r.fitting,sd=bwr))/mean(weightsw)
+              }
+              # mean(weightsw*Gaussian.ker.cdf(rc,mean=r.fitting,sd=bwr))/mean(weightsw)
+            }
+            dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
+            ur<-uniroot(dummy,interval = c(0,30))
+            return(ur$root)
           }
-          dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
-          ur<-uniroot(dummy,interval = c(0,30))
-          return(ur$root)
-        }
+        })
+
+        check.score = c(check.score,mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T))
+        # check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
+
+      },error=function(e){
+        is_error <<- TRUE
       })
-
-      check.scores[bww.idx] = mean(checkfn(quant=tau,r.eval-r0w.eval),na.rm=T)
-
-    },error=function(e){
-      is_error <<- TRUE
-    })
-    if(is_error) {
-      # print(pen.const)
-      check.scores[bww.idx] = 1e10
-      next
+      if(is_error) {
+        # print(pen.const)
+        # check.scores[bww.idx] = 1e10
+        next
+      }
     }
+    check.scores[bww.idx] = (1/k.folds)*sum(check.score, na.rm=T)
   }
   return(bww.vals[which.min(check.scores)])
 }
@@ -155,16 +178,24 @@ get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf){
 
 # kernel density estimation of the cdf when angles are defined by the L1-norm, then invert it
 radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
-                                   ker.pdf=Gaussian.ker.pdf,ker.cdf=Gaussian.ker.cdf,
+                                   ker=c("Gaussian","Epanechnikov"),
                                    mesh.eval=TRUE,n.mesh=200){
   # r, w              -> vectors
   # bww, bwr          -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
   # n.mesh            -> mesh for wpts
   # ker.pdf, ker.cdf  -> kernel pdf and cdf functions
 
+  if(ker=="Gaussian"){
+    ker.pdf = Gaussian.ker.pdf
+    ker.cdf = Gaussian.ker.cdf
+  } else if(ker=="Epanechnikov"){
+    ker.pdf = Epanechnikov.ker.pdf
+    ker.cdf = Epanechnikov.ker.cdf
+  }
+
   if(is.null(bww)){
     message("searching for optimal angular bandwidth for KDE threshold...")
-    bww = get_bww.2d(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
+    bww = get_bww.2d(r=r,w=w,tau=tau,bwr=bwr,ker=ker)
     message(paste("Fitting threshold at angular bandwidth",bww))
   }
 
@@ -212,26 +243,34 @@ radial.quants.L1.KDE.2d = function(r,w,tau=0.95,bww=0.05,bwr=0.05,
 
 ## General d-dimensional version of QR
 radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
-                        mesh.eval=TRUE, ker.pdf=mv.Gaussian.ker.pdf, ker.cdf=Gaussian.ker.cdf){
+                        mesh.eval=TRUE, ker=c("Gaussian","Epanechnikov")){ #ker.pdf=mv.Gaussian.ker.pdf, ker.cdf=Gaussian.ker.cdf){
   require(mvtnorm)
   # r, w      -> vector and matrix, angles defined by the L1 norm
   # bww, bwr  -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
 
   if(is.null(bww)){
-    message("searching for optimal angular bandwidth for KDE threshold...")
-    bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
-    message(paste("Fitting threshold at angular bandwidth",bww))
+    # message("searching for optimal angular bandwidth for KDE threshold...")
+    # bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
+    # message(paste("Fitting threshold at angular bandwidth",bww))
+    stop("ANgular bandwidth search not implemented yet.")
   }
 
   num.cols = dim(w)[2]
 
   r0w = apply(w, 1, function(ww){
 
-    # weightsw = dmvnorm(w[,-num.cols],mean=ww[-num.cols],sigma=(bww^2)*diag(num.cols-1))
-    weightsw = ker.pdf(x=w[,-num.cols], mean=ww[-num.cols], sd=bww)
+    if(ker=="Gaussian"){
+      weightsw = dmvnorm(w[,-num.cols],mean=ww[-num.cols],sigma=(bww^2)*diag(num.cols-1))
+    } else if(ker=="Epanechnikov"){
+      weightsw = mv.ker.pdf(x=w[,-num.cols], mean=ww[-num.cols], sd=bww,ker.pdf=Epanechnikov.ker.pdf)
+    }
 
     ccdf<-function(rc){
-      mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+      if(ker=="Gaussian"){
+        mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+      } else if(ker=="Epanechnikov"){
+        mean(weightsw*Epanechnikov.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+      }
     }
     dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
     ur<-uniroot(dummy,interval = c(0,30))
@@ -241,16 +280,26 @@ radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
   if(mesh.eval){
     wpts<-expand.grid(replicate(num.cols-1, seq(0,1,len=n.mesh), simplify = FALSE))#expand.grid(seq(0,1,len=n.mesh),seq(0,1,len=n.mesh),seq(0,1,len=n.mesh),seq(0,1,len=n.mesh))
     r.tau.wpts = apply(wpts,1,function(wpts.i){
+      # print(wpts.i)
       if(sum(wpts.i)>1){
         return(NA)
       } else{
-        weightsw = dmvnorm(w[,-num.cols],mean=wpts.i[-num.cols],sigma=(bww^2)*diag(num.cols-1))
+        if(ker=="Gaussian"){
+          weightsw = dmvnorm(w[,-num.cols],mean=wpts.i,sigma=(bww^2)*diag(num.cols-1))
+        } else if(ker=="Epanechnikov"){
+          weightsw = mv.ker.pdf(x=w[,-num.cols], mean=wpts.i, sd=bww, ker.pdf=Epanechnikov.ker.pdf)
+        }
 
         ccdf<-function(rc){
-          mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+          if(ker=="Gaussian"){
+            mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+          } else if(ker=="Epanechnikov"){
+            mean(weightsw*Epanechnikov.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+          }
         }
         dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
         ur<-uniroot(dummy,interval = c(0,30))
+        # print(ur$root)
         return(ur$root)
       }
     })
@@ -348,7 +397,7 @@ quant.score.2d.checkfn.hR = function(smoothness.lvl,w,r,tau=0.95,k.folds=5,metho
 
 }
 
-quant.score.checkfn = function(smoothness.lvl,w,r,tau,k.folds=5,method="KDE"){
+quant.score.checkfn = function(smoothness.lvl,w,r,tau,k.folds=5,method="KDE",...){
   # r,w -> vector and matrix, defined by L1 norm
   # tau -> the quantile
   # r0w -> the tau thrshold value at w
@@ -364,7 +413,7 @@ quant.score.checkfn = function(smoothness.lvl,w,r,tau,k.folds=5,method="KDE"){
 
     # fit the quantile estimates
     if(method=="KDE"){
-      r0w.eval = KDE.quant.eval(wpts=w.eval,r=r.fitting,w=w.fitting,tau=tau,bww=smoothness.lvl,bwr=0.05)
+      r0w.eval = KDE.quant.eval(wpts=w.eval,r=r.fitting,w=w.fitting,tau=tau,bww=smoothness.lvl,bwr=0.05,...)
     } else{
       stop("only supports KDE")
     }
@@ -379,7 +428,7 @@ quant.score.checkfn = function(smoothness.lvl,w,r,tau,k.folds=5,method="KDE"){
 
 # A function for evaluating r_{\tau}(w) at w
 
-KDE.quant.eval.2d = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,ker="Gaussian"){
+KDE.quant.eval.2d = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,ker=c("Gaussian","Epanechnikov")){
   # r, w              -> vectors
   # bww, bwr          -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
   # n.mesh            -> mesh for wpts
@@ -432,10 +481,11 @@ KDE.quant.eval.2d = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,ker="Gaussian")
 }
 
 KDE.quant.eval = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,
-                          ker.pdf=mv.Gaussian.ker.pdf,ker.cdf=Gaussian.ker.cdf){
+                          ker=c("Gaussian","Epanechnikov")){
   require(mvtnorm)
 
   if(is.null(bww)){
+    stop("Not implemented")
     message("searching for optimal angular bandwidth for KDE threshold...")
     bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
     message(paste("Fitting threshold at angular bandwidth",bww))
@@ -447,9 +497,19 @@ KDE.quant.eval = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,
     if(sum(wpts.i)>1){
       return(NA)
     } else{
-      weightsw = ker.pdf(x=w,mean=wpts.i,sd=bww)
+      if(ker=="Gaussian"){
+        weightsw = dmvnorm(w[,-n.dims],mean=wpts.i[-n.dims],sigma=(bww^2)*diag(n.dims-1))
+      } else if(ker=="Epanechnikov"){
+        weightsw = mv.ker.pdf(x=w[,-n.dims], mean=wpts.i[-n.dims], sd=bww, ker.pdf=Epanechnikov.ker.pdf)
+      }
+      # weightsw = ker.pdf(x=w,mean=wpts.i,sd=bww)
       ccdf<-function(rc){
-        mean(weightsw*ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+        if(ker=="Gaussian"){
+          mean(weightsw*Gaussian.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+        } else if(ker=="Epanechnikov"){
+          mean(weightsw*Epanechnikov.ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
+        }
+        # mean(weightsw*ker.cdf(rc,mean=r,sd=bwr))/mean(weightsw)
       }
       dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
       is_error <- FALSE

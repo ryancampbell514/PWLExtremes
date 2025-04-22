@@ -375,9 +375,9 @@ fit.pwlin.2d = function(r,w,r0w,locs,
 
 get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
   if(fW.fit & !joint.fit){
-    pen.consts = seq(0,30,length.out=100)
+    pen.consts = seq(0,50,length.out=50)
   } else {
-    pen.consts = seq(0,4,length.out=100)
+    pen.consts = seq(0,4,length.out=50)
   }
 
   k.folds = 4
@@ -392,45 +392,48 @@ get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
     # pen.const.W = pen.consts.W[pen.const.idx]
 
     # lik.scores.R13 = rep(NA,k.folds)
+    pen.consts.score = c()
 
-    # for(K in 1:k.folds){
-    K = 1
-    r.fitting = r[grps!=K]
-    w.fitting = w[grps!=K]
-    r0w.fitting = r0w[grps!=K]
-    r.eval = r[grps==K]
-    w.eval = w[grps==K]
-    r0w.eval = r0w[grps==K]
+    for(K in 1:k.folds){
+      # K = 1
+      r.fitting = r[grps!=K]
+      w.fitting = w[grps!=K]
+      r0w.fitting = r0w[grps!=K]
+      r.eval = r[grps==K]
+      w.eval = w[grps==K]
+      r0w.eval = r0w[grps==K]
 
-    is_error <- FALSE
-    tryCatch({
-      mod.fit = fit.pwlin.2d(r=r.fitting,r0w=r0w.fitting,w=w.fitting,
-                               locs=locs,pen.const=pen.const,method="BFGS",
-                               init.val=init.val,
-                             fW.fit=fW.fit,joint.fit=joint.fit,bound.fit=FALSE)
-    },error=function(e){
-      is_error <<- TRUE
-    })
-    if(is_error) {
-      # print(pen.const)
-      pen.consts.scores[pen.const.idx] = 1e10
-      next
+      is_error <- FALSE
+      tryCatch({
+        mod.fit = fit.pwlin.2d(r=r.fitting,r0w=r0w.fitting,w=w.fitting,
+                                 locs=locs,pen.const=pen.const,method="BFGS",
+                                 init.val=init.val,
+                               fW.fit=fW.fit,joint.fit=joint.fit,bound.fit=FALSE)
+      },error=function(e){
+        is_error <<- TRUE
+      })
+      if(is_error) {
+        # print(pen.const)
+        pen.consts.scores[pen.const.idx] = 1e10
+        next
+      }
+
+      w.eval.adj.angles = which.adj.angles.2d(angles=w.eval,locs=locs)
+
+      if(fW.fit & !joint.fit){
+        psi.vals = mod.fit$fW.mle
+      } else {
+        psi.vals = mod.fit$mle
+      }
+
+      pen.consts.score = c(pen.consts.score,
+        nll.pwlin.2d(psi=psi.vals, r=r.eval, r0w=r0w.eval,
+                                       w.adj.angles=w.eval.adj.angles,
+                                       locs=locs,
+                                       norm="1", marg="pos",pen.norm=NULL, pen.adj=NULL,
+                                       fW.fit=fW.fit,joint.fit=joint.fit))
     }
-
-    w.eval.adj.angles = which.adj.angles.2d(angles=w.eval,locs=locs)
-
-    if(fW.fit & !joint.fit){
-      psi.vals = mod.fit$fW.mle
-    } else {
-      psi.vals = mod.fit$mle
-    }
-
-    pen.consts.scores[pen.const.idx] =
-      nll.pwlin.2d(psi=psi.vals, r=r.eval, r0w=r0w.eval,
-                                     w.adj.angles=w.eval.adj.angles,
-                                     locs=locs,
-                                     norm="1", marg="pos",pen.norm=NULL, pen.adj=NULL,
-                                     fW.fit=fW.fit,joint.fit=joint.fit)
+    pen.consts.scores[pen.const.idx] = (1/k.folds)*sum(pen.consts.score,na.rm=T)
   }
   return(pen.consts[which.min(pen.consts.scores)])
 }
@@ -799,9 +802,9 @@ fit.pwlin = function(r,w,r0w,locs,
 
 get_pen_const = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
   if(fW.fit & !joint.fit){
-    pen.consts = seq(0,30,length.out=30)
+    pen.consts = seq(0,50,length.out=15)
   } else {
-    pen.consts = seq(0,4,length.out=30)
+    pen.consts = seq(0,4,length.out=15)
   }
 
   k.folds = 4
@@ -816,46 +819,47 @@ get_pen_const = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
 
     pen.const = pen.consts[pen.const.idx]
     # pen.const.W = pen.consts.W[pen.const.idx]
-
     # lik.scores.R13 = rep(NA,k.folds)
+    pen.const.score = c()
+    for(K in 1:k.folds){
+      # K = 1
+      r.fitting = r[grps!=K]
+      w.fitting = w[grps!=K,]
+      r0w.fitting = r0w[grps!=K]
+      r.eval = r[grps==K]
+      w.eval = w[grps==K,]
+      r0w.eval = r0w[grps==K]
 
-    # for(K in 1:k.folds){
-    K = 1
-    r.fitting = r[grps!=K]
-    w.fitting = w[grps!=K,]
-    r0w.fitting = r0w[grps!=K]
-    r.eval = r[grps==K]
-    w.eval = w[grps==K,]
-    r0w.eval = r0w[grps==K]
+      is_error <- FALSE
+      tryCatch({
+        mod.fit = fit.pwlin(r=r.fitting,r0w=r0w.fitting,w=w.fitting,
+                               locs=locs,pen.const=pen.const,method="BFGS",
+                               init.val=init.val,
+                               fW.fit=fW.fit,joint.fit=joint.fit,bound.fit=FALSE)
+      },error=function(e){
+        is_error <<- TRUE
+      })
+      if(is_error) {
+        # print(pen.const)
+        pen.consts.scores[pen.const.idx] = 1e10
+        next
+      }
 
-    is_error <- FALSE
-    tryCatch({
-      mod.fit = fit.pwlin(r=r.fitting,r0w=r0w.fitting,w=w.fitting,
-                             locs=locs,pen.const=pen.const,method="BFGS",
-                             init.val=init.val,
-                             fW.fit=fW.fit,joint.fit=joint.fit,bound.fit=FALSE)
-    },error=function(e){
-      is_error <<- TRUE
-    })
-    if(is_error) {
-      # print(pen.const)
-      pen.consts.scores[pen.const.idx] = 1e10
-      next
+      w.eval.adj.angles = which.adj.angles(angles=w.eval,locs=locs)
+
+      if(fW.fit & !joint.fit){
+        psi.vals = mod.fit$fW.mle
+      } else {
+        psi.vals = mod.fit$mle
+      }
+
+      pen.consts.score = c(pen.consts.score,
+        nll.pwlin(psi=psi.vals, r=r.eval, r0w=r0w.eval,
+                     w.adj.angles=w.eval.adj.angles,
+                     locs=locs,
+                     fW.fit=fW.fit,joint.fit=joint.fit))
     }
-
-    w.eval.adj.angles = which.adj.angles(angles=w.eval,locs=locs)
-
-    if(fW.fit & !joint.fit){
-      psi.vals = mod.fit$fW.mle
-    } else {
-      psi.vals = mod.fit$mle
-    }
-
-    pen.consts.scores[pen.const.idx] =
-      nll.pwlin(psi=psi.vals, r=r.eval, r0w=r0w.eval,
-                   w.adj.angles=w.eval.adj.angles,
-                   locs=locs,
-                   fW.fit=fW.fit,joint.fit=joint.fit)
+    pen.consts.scores[pen.const.idx] = (1/k.folds)*sum(pen.consts.score,na.rm=T)
   }
   return(pen.consts[which.min(pen.consts.scores)])
 }
