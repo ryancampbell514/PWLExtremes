@@ -104,7 +104,7 @@ get_bww.2d = function(r=r,w=w,tau=tau,bwr=bwr,ker=c("Gaussian","Epanechnikov")){
   return(bww.vals[which.min(check.scores)])
 }
 
-get_bww = function(r=r,w=w,tau=tau,bwr=bwr,,ker=c("Gaussian","Epanechnikov")){
+get_bww = function(r=r,w=w,tau=tau,bwr=bwr,ker=c("Gaussian","Epanechnikov")){
 
   bww.vals = seq(0,0.2,length.out=10)[-1]
 
