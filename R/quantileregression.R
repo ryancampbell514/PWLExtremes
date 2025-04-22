@@ -487,7 +487,7 @@ KDE.quant.eval = function(wpts,r,w,tau=0.95,bww=0.05,bwr=0.05,
   if(is.null(bww)){
     stop("Not implemented")
     message("searching for optimal angular bandwidth for KDE threshold...")
-    bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
+    bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker=ker)
     message(paste("Fitting threshold at angular bandwidth",bww))
   }
 
