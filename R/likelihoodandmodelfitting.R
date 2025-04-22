@@ -414,7 +414,7 @@ get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
       })
       if(is_error) {
         # print(pen.const)
-        pen.consts.scores[pen.const.idx] = 1e10
+        # pen.consts.scores[pen.const.idx] = 1e10
         next
       }
 
@@ -820,7 +820,7 @@ get_pen_const = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
     pen.const = pen.consts[pen.const.idx]
     # pen.const.W = pen.consts.W[pen.const.idx]
     # lik.scores.R13 = rep(NA,k.folds)
-    pen.const.score = c()
+    pen.consts.score = c()
     for(K in 1:k.folds){
       # K = 1
       r.fitting = r[grps!=K]
@@ -841,7 +841,7 @@ get_pen_const = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
       })
       if(is_error) {
         # print(pen.const)
-        pen.consts.scores[pen.const.idx] = 1e10
+        # pen.consts.scores[pen.const.idx] = 1e10
         next
       }
 
