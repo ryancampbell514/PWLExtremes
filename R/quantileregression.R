@@ -249,10 +249,10 @@ radial.quants.L1.KDE = function(r,w,tau=0.95,bww=0.05,bwr=0.05,n.mesh=30,
   # bww, bwr  -> bandwidths affects smoothness / how close you can get to "pointy" r_0(w)
 
   if(is.null(bww)){
-    # message("searching for optimal angular bandwidth for KDE threshold...")
-    # bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker.pdf=ker.pdf,ker.cdf=ker.cdf)
-    # message(paste("Fitting threshold at angular bandwidth",bww))
-    stop("ANgular bandwidth search not implemented yet.")
+    message("searching for optimal angular bandwidth for KDE threshold...")
+    bww = get_bww(r=r,w=w,tau=tau,bwr=bwr,ker=ker)
+    message(paste("Fitting threshold at angular bandwidth",bww))
+    # stop("ANgular bandwidth search not implemented yet.")
   }
 
   num.cols = dim(w)[2]
