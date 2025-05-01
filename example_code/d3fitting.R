@@ -16,12 +16,6 @@ usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
                    0,0,0,1)
                  ,4,4,byrow=T)
 
-# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
-source("~/GitHub/PWLExtremes/R/likelihoodandmodelfitting.R")
-
-# setwd("~/GitHub/PWLExtremes/example_code")
-
 set.seed(4444)
 n = 5000  # generate n datapoints
 tau=0.95  # the quantile at which we estimate the radial threshold
@@ -52,7 +46,7 @@ r<-apply(x,1,sum)
 w<-x/r
 
 # estimate the threshold
-qr = radial.quants.L1.KDE(r,w,tau=tau,bww=0.05,bwr=0.05)
+qr = radial.quants.L1.KDE(r,w,tau=tau,bww=0.05,bwr=0.05,ker="Gaussian")
 
 # keep the exceedances
 excind<-r>qr$r0w
@@ -102,11 +96,15 @@ for(i in 1:nrow(del.tri$tri)){
 }
 
 # fit the models
-model.fit.R.unbounded  = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound=FALSE)
-model.fit.R.bounded    = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=TRUE)
-model.fit.W            = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=2,fW.fit=T,method="BFGS")
-model.fit.RW.unbounded = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=FALSE,fW.fit=T,joint.fit=T)
-model.fit.RW.bounded   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=0.1,method="BFGS",bound=TRUE,fW.fit=T,joint.fit=T)
+model.fit.R.unbounded   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE)
+model.fit.R.unbounded2  = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fixed.shape=FALSE)
+model.fit.R.bounded     = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE)
+model.fit.R.bounded2    = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fixed.shape=FALSE)
+model.fit.RW.unbounded  = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fW.fit=T,joint.fit=T)
+model.fit.RW.unbounded2 = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fW.fit=T,joint.fit=T,fixed.shape=FALSE)
+model.fit.RW.bounded    = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fW.fit=T,joint.fit=T)
+model.fit.RW.bounded2   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fW.fit=T,joint.fit=T,fixed.shape=FALSE)
+model.fit.W             = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=20,fW.fit=T,method="BFGS")
 
 # plot the unit level sets
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.unbounded$mle,ref.angles=par.locs)

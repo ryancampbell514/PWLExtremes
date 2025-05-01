@@ -110,7 +110,7 @@ opt.pwl.2d = function(NLL, r, r0w, w, locs,
     opt$fW.par = opt$par
     opt$init.val = init.val
     opt$shape=2
-  } else if(fixed.shape & fW.fit & !joint.fit){
+  } else if(fW.fit & !joint.fit){
     # only fit the angular model together, taking into account the redundancy
     init.val = init.val[-1]  # remove redundancy, fix the first parameter to 1.
     opt <- optim(NLL, par = init.val, r = r,
@@ -122,7 +122,7 @@ opt.pwl.2d = function(NLL, r, r0w, w, locs,
     opt$fW.par = c(1,opt$fW.par)  # account for redundancy
     opt$par = NULL
     opt$init.val = c(1,init.val)
-    opt$shape=2
+    opt$shape=NULL
   } else if(!fixed.shape & !fW.fit & !joint.fit){
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
@@ -145,9 +145,6 @@ opt.pwl.2d = function(NLL, r, r0w, w, locs,
     opt$shape = opt$par[1]
     opt$par = opt$par[-1]
     opt$fW.par = opt$par
-  } else if(!fixed.shape & fW.fit & !joint.fit){
-    # only fit the angular model together, taking into account the redundancy
-    stop("No shape parameter in the angular model.")
   }
   opt$aic = 2*(opt$value + length(opt$par))
   # return(list(mle = opt$par,fW.mle = opt$fW.par, shape=opt$shape, nll = opt$value, convergence = opt$conv,
@@ -575,7 +572,19 @@ pwl.L2.pen = function(psi,locs,del.tri){
   return(mean(pen))   # should this be "mean" or "sum"?
 }
 
-nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
+nll.pwlin = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, locs, fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
+
+  num.cols = length(w.adj.angles[[1]]$w)
+
+  if(!fixed.shape){
+    shape=psi[1]
+    psi=psi[-1]
+    if(shape < 0){
+      return(1e+11)
+    }
+  } else {
+    shape=num.cols
+  }
 
   # ensure we have no negative parameters
   if(pos.par) {
@@ -589,19 +598,18 @@ nll.pwlin = function(psi, r, r0w, w.adj.angles, del.tri, locs, fW.fit, joint.fit
   #   return(1e+11)
   # }
 
-  num.cols = length(w.adj.angles[[1]]$w)
 
   if(fW.fit & joint.fit){
     rate <- pwlin.g.vals(w.adj.angles=w.adj.angles,par=psi,par.locs=locs)
-    ll1 <- dgamma(r, shape = num.cols, rate = rate, log = T)
-    ll2 <- log(pgamma(r0w, shape = num.cols, rate = rate, lower.tail = F))
+    ll1 <- dgamma(r, shape = shape, rate = rate, log = T)
+    ll2 <- log(pgamma(r0w, shape = shape, rate = rate, lower.tail = F))
     G.vol = G.vol(psi,locs)
     llw = -log(num.cols*G.vol) -num.cols*log(rate)
     NLL = -sum(ll1) + sum(ll2) - sum(llw)
   } else if(!fW.fit & !joint.fit){
     rate <- pwlin.g.vals(w.adj.angles=w.adj.angles,par=psi,par.locs=locs)
-    ll1 <- dgamma(r, shape = num.cols, rate = rate, log = T)
-    ll2 <- log(pgamma(r0w, shape = num.cols, rate = rate, lower.tail = F))
+    ll1 <- dgamma(r, shape = shape, rate = rate, log = T)
+    ll2 <- log(pgamma(r0w, shape = shape, rate = rate, lower.tail = F))
     NLL = -sum(ll1) + sum(ll2)
   } else if(fW.fit & !joint.fit){
     psi = c(1,psi)  # account for redundancy
@@ -630,9 +638,9 @@ opt.pwl = function(NLL, r, r0w, w, locs,
 
   # t1 = Sys.time()
 
-  if(is.null(init.val)){
-    init.val = rep(1,nrow(locs))
-  }
+  # if(is.null(init.val)){
+  #   init.val = rep(1,nrow(locs))
+  # }
 
   w.adj.angles = which.adj.angles(w,locs)
 
@@ -646,8 +654,11 @@ opt.pwl = function(NLL, r, r0w, w, locs,
                  fW.fit=F,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
+                 fixed.shape=fixed.shape,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = NULL  # didn't model angles
+    opt$init.val = init.val
+    opt$shape=num.cols
   } else if(fixed.shape & fW.fit & joint.fit){
     # fit the radial model and angular model together
     opt <- optim(NLL, par = init.val, r = r,
@@ -655,9 +666,12 @@ opt.pwl = function(NLL, r, r0w, w, locs,
                  fW.fit=T,joint.fit=T,
                  pen.const=pen.const,
                  del.tri=del.tri,
+                 fixed.shape=fixed.shape,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = opt$par
-  } else if(fixed.shape & fW.fit & !joint.fit){
+    opt$init.val = init.val
+    opt$shape=num.cols
+  } else if(fW.fit & !joint.fit){
     # fit the angular model only
     init.val = init.val[-1]  # remove redundancy, fit the first parameter to 1.
     opt <- optim(NLL, par = init.val, r = r,
@@ -665,19 +679,58 @@ opt.pwl = function(NLL, r, r0w, w, locs,
                  fW.fit=T,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
+                 fixed.shape=fixed.shape,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
+    # opt$fW.par = opt$par
+    # opt$fW.par = c(1,opt$fW.par)  # account for redundancy
+    # opt$par = NULL
     opt$fW.par = opt$par
     opt$fW.par = c(1,opt$fW.par)  # account for redundancy
     opt$par = NULL
-  } else if(!fixed.shape){
-    stop("fitting shape not implemented.")
+    opt$init.val = c(1,init.val)
+    opt$shape=NULL
+  } else if(!fixed.shape & !fW.fit & !joint.fit){
+    # fit the conditional radial model only
+    opt <- optim(NLL, par = init.val, r = r,
+                 r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 fW.fit=F,joint.fit=F,
+                 pen.const=pen.const,
+                 del.tri=del.tri,
+                 fixed.shape=fixed.shape,
+                 control=list(maxit=1e6,reltol=1e-5),method=method,...)
+    # opt$fW.par = NULL  # didn't model angles
+    # opt$init.val = init.val
+    # opt$shape=num.cols
+    opt$fW.par = NULL  # didn't model angles
+    opt$init.val = init.val
+    opt$shape = opt$par[1]
+    opt$par = opt$par[-1]
+  } else if(!fixed.shape & fW.fit & joint.fit){
+    # fit the radial model and angular model together
+    opt <- optim(NLL, par = init.val, r = r,
+                 r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 fW.fit=T,joint.fit=T,
+                 pen.const=pen.const,
+                 del.tri=del.tri,
+                 fixed.shape=fixed.shape,
+                 control=list(maxit=1e6,reltol=1e-5),method=method,...)
+    # opt$fW.par = opt$par
+    # opt$init.val = init.val
+    # opt$shape=num.cols
+    opt$init.val = init.val
+    opt$shape = opt$par[1]
+    opt$par = opt$par[-1]
+    opt$fW.par = opt$par
   }
+  # else if(!fixed.shape){
+  #   stop("fitting shape not implemented.")
+  # }
 
   # t2 = Sys.time()
 
   opt$init.val = init.val#c(3,init.val)
   opt$aic = 2*(opt$value + length(opt$par))
-  return(list(mle = opt$par, fW.mle = opt$fW.par, shape=dim(w)[2],
+  return(list(mle = opt$par, fW.mle = opt$fW.par, shape=opt$shape,
               nllh = opt$value, convergence = opt$conv,
               aic = opt$aic, init.val = opt$init.val))
 }
@@ -692,8 +745,13 @@ fit.pwlin = function(r,w,r0w,locs,
 
   t1 = Sys.time()
 
-  if(is.null(init.val)){
+  # if(is.null(init.val)){
+  #   init.val = rep(1,nrow(locs))
+  # }
+  if(is.null(init.val) & fixed.shape){
     init.val = rep(1,nrow(locs))
+  } else if(is.null(init.val) & !fixed.shape){
+    init.val = rep(1,nrow(locs)+1)
   }
 
   if(is.null(pen.const)){
@@ -708,31 +766,42 @@ fit.pwlin = function(r,w,r0w,locs,
   del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
 
   # fixed.pars.idx=NULL
-  opt <- opt.pwl(NLL=nll.pwlin,r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,...)
+  opt <- opt.pwl(NLL=nll.pwlin,r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,
+                 fixed.shape=fixed.shape,fW.fit=fW.fit,joint.fit=joint.fit,
+                 pen.const=pen.const,method=method,...)
 
   # print(opt)
 
   if(bound.fit){
 
+    shape.val = opt$shape
     mle = opt$mle
 
     lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, fixed.pars,
-                          fixed.pars.idx, fW.fit, joint.fit, pos.par = TRUE,
+                          fixed.pars.idx, fixed.shape, fW.fit, joint.fit, pos.par = TRUE,
                           pen.const=0,del.tri=del.tri){
 
-      psi.full = numeric(nrow(locs))
-      psi.full[fixed.pars.idx] = fixed.pars
-      psi.full[-fixed.pars.idx] = psi
-
+      # psi.full = numeric(nrow(locs))
+      # psi.full[fixed.pars.idx] = fixed.pars
+      # psi.full[-fixed.pars.idx] = psi
+    if(fixed.shape){
+      par.full = numeric(nrow(locs))
+      par.full[fixed.pars.idx] = fixed.pars
+      par.full[-fixed.pars.idx] = psi
+    } else {
+      par.full = numeric(nrow(locs)+1)
+      par.full[fixed.pars.idx+1] = fixed.pars
+      par.full[-(fixed.pars.idx+1)] = psi
+    }
       # if(pos.par) {
       #   if (any(psi.full <= 0)){
       #     return(1e+11)
       #   }
       # }
 
-      return(nll.pwlin(psi=psi.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
+      return(nll.pwlin(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
                        locs=locs, fW.fit=fW.fit, joint.fit=joint.fit, pos.par=TRUE,
-                       pen.const=pen.const,del.tri=del.tri))
+                       pen.const=pen.const,del.tri=del.tri,fixed.shape=fixed.shape))
 
     }
     fixed.pars.idx = c()
@@ -767,11 +836,16 @@ fit.pwlin = function(r,w,r0w,locs,
         mle[lst$loc] = mle[lst$loc]/lst$val
       }
 
+      init.vals=mle[-fixed.pars.idx]
+      if(!fixed.shape){
+        init.vals = c(shape.val,init.vals)
+      }
+
       if(nrow(locs)==length(fixed.pars.idx)){
         break  # we fixed all the parameters
       }
 
-      if(fixed.shape & !fW.fit & !joint.fit){
+      if(!fW.fit & !joint.fit){
         # fit the conditional radial model only
         init.vals = init.val[-fixed.pars.idx]
         # opt <- optim(lik.custom, par = init.vals, r = r,
@@ -781,9 +855,10 @@ fit.pwlin = function(r,w,r0w,locs,
         #              control=list(maxit=1e6,reltol=1e-5),method=method,...)
         opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
                       fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                      fixed.shape=fixed.shape,
                       fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
         opt2$fW.par = NULL  # didn't model angles
-      } else if(fixed.shape & fW.fit & joint.fit){
+      } else if(fW.fit & joint.fit){
         # fit the radial model and angular model together
         init.vals = init.val[-fixed.pars.idx]
         # opt <- optim(lik.custom, par = init.vals, r = r,
@@ -793,12 +868,14 @@ fit.pwlin = function(r,w,r0w,locs,
         #              control=list(maxit=1e6,reltol=1e-5),method=method,...)
         opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
                        fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                       fixed.shape=fixed.shape,
                        fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
         opt2$fW.par = opt2$mle
       } else {
         stop("ERROR in likelihood setup")
       }
       mle[-fixed.pars.idx] = opt2$mle
+      shape.val = opt2$shape
       # i=i+1
     }
 
@@ -810,7 +887,7 @@ fit.pwlin = function(r,w,r0w,locs,
       fW.mle = NULL
     }
 
-    return(list(mle = mle, fW.mle = fW.mle, shape=dim(w)[2],
+    return(list(mle = mle, fW.mle = fW.mle, shape=shape.val,
                 pen.const=pen.const,
                 fixed.pars.idx=fixed.pars.idx,
                 nllh = NULL, convergence = opt2$conv,

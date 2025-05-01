@@ -6,17 +6,8 @@ library(geometry)
 library(geometricMVE)
 library(evd)
 library(mvtnorm)
-library(this.path)
-
-setwd(this.path::here())
 
 library(PWLExtremes)
-source("~/GitHub/PWLExtremes/R/likelihoodandmodelfitting.R")
-
-# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
-
-# setwd("~/GitHub/PWLExtremes/example_code")
 
 set.seed(4444)
 n = 5000  # generate n datapoints
@@ -57,21 +48,16 @@ lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
 
 # Fit the models
 par.locs = seq(0,1,length.out=11)
-model.fit.R.unbounded             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
-model.fit.R.unbounded2            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixed.shape = F)
-
-
-model.fit.R.unbounded.pensearch   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F)
-model.fit.R.bounded               = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
-model.fit.R.bounded2               = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixed.shape = F)
-
-model.fit.W                       = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,fW.fit=T,method="BFGS")
-
-model.fit.RW.unbounded            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
-model.fit.RW.unbounded2            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,fixed.shape = F)
-
-model.fit.RW.bounded              = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
-model.fit.RW.bounded2              = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T,fixed.shape = F)
+model.fit.R.unbounded           = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
+model.fit.R.unbounded2          = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixed.shape = F)
+model.fit.R.unbounded.pensearch = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F)
+model.fit.R.bounded             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
+model.fit.R.bounded2            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixed.shape = F)
+model.fit.RW.unbounded          = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
+model.fit.RW.unbounded2         = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,fixed.shape = F)
+model.fit.RW.bounded            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
+model.fit.RW.bounded2           = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T,fixed.shape = F)
+model.fit.W                     = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,fW.fit=T,method="BFGS")
 
 # plot the unit level sets
 par(mfrow=c(2,2),pty="s")

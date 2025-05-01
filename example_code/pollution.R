@@ -6,42 +6,25 @@ library(rgl)
 library(openair)
 library(PWLExtremes)
 
-# fn.dir = "~/GitHub/PWLExtremes/R"  #PATH TO PWLEXTREMES/R
-# invisible(sapply(file.path(fn.dir,list.files(fn.dir)),source))
-
-# setwd("~/GitHub/PWLExtremes/example_code")
-
 load("~/GitHub/PWLExtremes/ds_4d_urban.Rdata")
 head(ds.exp.4d)
 
 r<-apply(ds.exp.4d,1,sum)
 w<-ds.exp.4d/r
 
-tau=0.70
-qr=radial.quants.L1.KDE(r=r,w=w,tau=tau,mesh.eval=T)
+tau=0.075
+qr=radial.quants.L1.KDE(r=r,w=w,tau=tau,mesh.eval=T,ker="Gaussian")
 r0w = qr$r0w
 excind<-r>r0w
 rexc<-r[excind]
 wexc<-w[excind,]
 r0w<-r0w[excind]
 
-# Do a 2-step prodecure:
-# First, fit the model on a sparse set of reference angles.
-# Then, use these MLEs as starting values for model fitting on a more
-# refined set of reference angles.
+# Define the reference angles, or "parameter locations"
 par.locs = rbind(diag(4),
                  rep(1/4,4),
                  c(1/3,1/3,1/3,0),c(1/3,1/3,0,1/3),c(1/3,0,1/3,1/3),c(0,1/3,1/3,1/3),
                  c(0.5,0.5,0,0),c(0.5,0,0.5,0),c(0.5,0,0,0.5),c(0,0.5,0.5,0),c(0,0.5,0,0.5),c(0,0,0.5,0.5))
-
-# set the initial parameters of model fitting
-init = KDE.quant.eval(wpts=par.locs,r=r,w=w,tau=tau)
-init = init/max(par.locs[,1] * init, na.rm = TRUE)
-init = ifelse(init > 1 / apply(par.locs,1,max), 1/ apply(par.locs,1,max), init)
-
-R.fit.13 = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init,pen.const=0.0005,#0.0002343750,
-                        method="BFGS")
-
 tri.mat = geometry::delaunayn(p=par.locs[,-4], output.options=TRUE)$tri
 new.mesh = t(apply(tri.mat,1,function(row.idx){
   return(apply(par.locs[row.idx,],2,mean))
@@ -50,17 +33,22 @@ new.mesh = new.mesh + rnorm(prod(dim(new.mesh)),sd=0.001)
 new.mesh = new.mesh / apply(new.mesh,1,sum)
 new.mesh = new.mesh[apply(new.mesh,1,function(w) !any(w<0)),]
 new.mesh = new.mesh[apply(new.mesh,1,function(vec) sum(vec>0)>2),]
-par.locs.2 = data.frame(rbind(par.locs,new.mesh))
-par.locs.2 = as.matrix(par.locs.2[!duplicated(par.locs.2), ])
+par.locs = data.frame(rbind(par.locs,new.mesh))
+par.locs = as.matrix(par.locs[!duplicated(par.locs), ])
 
-init.2.mod13 = 1/gfun.pwl(x = par.locs.2, par = R.fit.13$mle, ref.angles = par.locs)
-init.2.mod13 = ifelse(init.2.mod13 > 1 / apply(par.locs.2,1,max), apply(par.locs.2,1,max), init.2.mod13)
+# set the initial parameters of model fitting
+init = KDE.quant.eval(wpts=par.locs,r=r,w=w,tau=tau,ker="Gaussian")
+init = init/max(par.locs[,1] * init, na.rm = TRUE)
+init = ifelse(init > 1 / apply(par.locs,1,max), 1/ apply(par.locs,1,max), init)
 
-R.fit.13.refit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs.2,init.val=init.2.mod13,pen.const=0.0001,method="BFGS")
+# fit the radial model
+R.fit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init,
+                  pen.const=1, method="BFGS",bound.fit=TRUE)
+mle = R.fit$mle
 
-# save the MLEs and their locations
-mle = R.fit.13.refit$mle
-par.locs = par.locs.2
+# fit the angular model
+W.fit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init/init[1],
+                  pen.const=20,method="BFGS",fW.fit=TRUE)
 
 #############################################################################
 
@@ -136,10 +124,7 @@ view3d(userMatrix = usermat)
 
 # PP, QQ, and return-level plots
 
-mle=R.fit.13.refit$mle
-dirnm="mod1"
-# mle = res$RW.fit.5$mle
-# par.locs = res$par.locs
+mle=R.fit$mle
 par.locs = R.fit.13.refit$par.locs
 gfun = function(w,par,locs=par.locs){
   gfun.pwl(x=w,par=par,ref.angles=locs)
