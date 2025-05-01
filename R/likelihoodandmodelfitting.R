@@ -5,6 +5,9 @@ nll.pwlin.2d = function(psi, r, r0w, w.adj.angles, locs, norm, marg, pen.norm , 
   if(!fixed.shape){
     shape=psi[1]
     psi=psi[-1]
+    if(shape < 0){
+      return(1e+11)
+    }
   } else {
     shape=2
   }
@@ -120,22 +123,36 @@ opt.pwl.2d = function(NLL, r, r0w, w, locs,
     opt$par = NULL
     opt$init.val = c(1,init.val)
     opt$shape=2
-  } else if(!fixed.shape){
+  } else if(!fixed.shape & !fW.fit & !joint.fit){
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
                  pen.norm=pen.norm, pen.adj=pen.adj,
-                 fW.fit=F,joint.fit=F,pen.const=pen.const,fixed.shape=fixed.shape,
+                 fW.fit=fW.fit,joint.fit=fW.fit,pen.const=pen.const,fixed.shape=fixed.shape,
                  control=list(maxit=1e6),method=method,...)
     #method="L-BFGS-B",gr=NULL,lower=rep(0.01,length(locs)),upper=rep(10,length(locs))
     opt$fW.par = NULL  # didn't model angles
     opt$init.val = init.val
     opt$shape = opt$par[1]
     opt$par = opt$par[-1]
+  } else if(!fixed.shape & fW.fit & joint.fit){
+    # only fit the radial model and angular model togethr
+    opt <- optim(NLL, par = init.val, r = r,
+                 r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
+                 pen.norm=pen.norm, pen.adj=pen.adj,
+                 fW.fit=T,joint.fit=T,pen.const=pen.const,fixed.shape=fixed.shape,
+                 control=list(maxit=1e6),method=method,...)
+    opt$init.val = init.val
+    opt$shape = opt$par[1]
+    opt$par = opt$par[-1]
+    opt$fW.par = opt$par
+  } else if(!fixed.shape & fW.fit & !joint.fit){
+    # only fit the angular model together, taking into account the redundancy
+    stop("No shape parameter in the angular model.")
   }
   opt$aic = 2*(opt$value + length(opt$par))
   # return(list(mle = opt$par,fW.mle = opt$fW.par, shape=opt$shape, nll = opt$value, convergence = opt$conv,
   #             aic = opt$aic, init.val = opt$init.val))
-  return(list(mle = opt$par, fW.mle = opt$fW.par, shape=2,
+  return(list(mle = opt$par, fW.mle = opt$fW.par, shape=opt$shape,
               nllh = opt$value, convergence = opt$conv,
               aic = opt$aic, init.val = opt$init.val))
 }
@@ -146,8 +163,10 @@ fit.pwlin.2d = function(r,w,r0w,locs,
                      method="BFGS",pen.const=NULL,bound.fit=FALSE,
                      marg="pos",pen.norm="2",...){
 
-  if(is.null(init.val)){
+  if(is.null(init.val) & fixed.shape){
     init.val = rep(1,length(locs))
+  } else if(is.null(init.val) & !fixed.shape){
+    init.val = rep(1,length(locs)+1)
   }
 
   if(is.null(pen.const)){
@@ -162,29 +181,37 @@ fit.pwlin.2d = function(r,w,r0w,locs,
 
   nnodes=length(locs)
   w.adj.angles = which.adj.angles.2d(angles=w, locs, norm, marg)
-  opt = opt.pwl.2d(NLL=nll.pwlin.2d, r=r, r0w=r0w,w=w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const)
+  opt = opt.pwl.2d(NLL=nll.pwlin.2d, r=r, r0w=r0w,w=w,locs=locs,init.val=init.val,fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,fixed.shape=fixed.shape)
 
   if(bound.fit){
     if(fW.fit & !joint.fit){
       stop("No need to bound anglar parameters if not jointly fitting.")
     }
 
+    shape.val = opt$shape
     mle=opt$mle
 
     lik.custom = function(psi, r, r0w, w.adj.angles,
                           locs, norm, marg,
                           pen.norm, pen.adj,
                           fixed.pars, fixed.pars.idx,
-                          fW.fit,joint.fit,pen.const,fixed.shape=T){
+                          fW.fit,joint.fit,pen.const,fixed.shape){
 
-      par.full = numeric(length(locs))
-      par.full[fixed.pars.idx] = fixed.pars
-      par.full[-fixed.pars.idx] = psi
+      if(fixed.shape){
+        par.full = numeric(length(locs))
+        par.full[fixed.pars.idx] = fixed.pars
+        par.full[-fixed.pars.idx] = psi
+      } else {
+        par.full = numeric(length(locs)+1)
+        par.full[fixed.pars.idx+1] = fixed.pars
+        par.full[-(fixed.pars.idx+1)] = psi
+      }
 
       return(nll.pwlin.2d(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
                           locs=locs,norm=norm,marg=marg,
                           pen.norm=pen.norm, pen.adj=pen.adj,
-                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const))
+                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,
+                          fixed.shape=fixed.shape))
     }
 
 
@@ -283,10 +310,15 @@ fit.pwlin.2d = function(r,w,r0w,locs,
         }
       }
 
+      init.vals=mle[-fixed.pars.idx]
+      if(!fixed.shape){
+        init.vals = c(shape.val,init.vals)
+      }
+
       # re-fit the model
-      if(fixed.shape & !fW.fit & !joint.fit){
+      if(!fW.fit & !joint.fit){
         # only fit the conditional radial model
-        init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
+        # init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
         # opt <- optim(lik.custom, par = init.vals, r = r,
         #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
         #              pen.norm=pen.norm, pen.adj=pen.adj,
@@ -294,12 +326,14 @@ fit.pwlin.2d = function(r,w,r0w,locs,
         #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
         #              control=list(maxit=1e6),method=method)  #method="L-BFGS-B",gr=NULL,lower=rep(0.01,length(locs)-length(fixed.pars.idx)),upper=rep(10,length(locs)-length(fixed.pars.idx))
         opt2 = opt.pwl.2d(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
-                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                          fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,
+                          fixed.shape=fixed.shape,
+                          method=method,
                           fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx)
         opt2$fW.par = NULL  # didn't model angles
-      } else if(fixed.shape & fW.fit & joint.fit){
+      } else if(fW.fit & joint.fit){
         # only fit the radial model and angular model together
-        init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
+        # init.vals=init.val[-fixed.pars.idx]  #rep(1,length(locs)-length(fixed.pars.idx))
         # opt <- optim(lik.custom, par = init.vals, r = r,
         #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs, norm=norm, marg=marg,
         #              pen.norm=pen.norm, pen.adj=pen.adj,
@@ -308,6 +342,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
         #              control=list(maxit=1e6),method=method)
         opt2 = opt.pwl.2d(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
                           fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
+                          fixed.shape=fixed.shape,
                           fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx)
         opt2$fW.par = opt2$mle
       } else {
@@ -315,6 +350,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
       }
 
       mle[-fixed.pars.idx] = opt2$mle
+      shape.val = opt2$shape
 
       if(marg=="pos"){
         locs.cart = cbind(locs,1-locs)
@@ -352,7 +388,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
     return(list(mle =mle,
                 fixed.pars.idx=fixed.pars.idx,
                 fW.mle = fW.mle,
-                shape=2,
+                shape=opt$shape,
                 pen.const=pen.const,
                 nll = NULL,
                 convergence = opt2$conv,
@@ -364,7 +400,7 @@ fit.pwlin.2d = function(r,w,r0w,locs,
     return(list(mle =opt$mle,
                 fixed.pars.idx=NULL,
                 fW.mle = opt$fW.mle,
-                shape=2,
+                shape=opt$shape,
                 pen.const=pen.const,
                 nll = opt$nllh,
                 convergence = opt$conv,

@@ -40,7 +40,7 @@ r<-x[,1]+x[,2]
 w<-x[,1]/r
 
 # estimate the threshold
-qr = radial.quants.L1.KDE.2d(r,w,tau=tau,bww=0.05,bwr=0.05)
+qr = radial.quants.L1.KDE.2d(r,w,tau=tau,bww=0.05,bwr=0.05,ker="Gaussian")
 
 # keep the exceedances
 r0w=qr$r0w
@@ -57,12 +57,21 @@ lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
 
 # Fit the models
 par.locs = seq(0,1,length.out=11)
-model.fit.R.unbounded   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
+model.fit.R.unbounded             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
+model.fit.R.unbounded2            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixed.shape = F)
+
+
 model.fit.R.unbounded.pensearch   = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F)
-model.fit.R.bounded     = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
-model.fit.W             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,fW.fit=T,method="BFGS")
-model.fit.RW.unbounded  = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
-model.fit.RW.bounded    = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
+model.fit.R.bounded               = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
+model.fit.R.bounded2               = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixed.shape = F)
+
+model.fit.W                       = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,fW.fit=T,method="BFGS")
+
+model.fit.RW.unbounded            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
+model.fit.RW.unbounded2            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,fixed.shape = F)
+
+model.fit.RW.bounded              = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
+model.fit.RW.bounded2              = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T,fixed.shape = F)
 
 # plot the unit level sets
 par(mfrow=c(2,2),pty="s")
