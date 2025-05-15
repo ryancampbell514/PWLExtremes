@@ -1,49 +1,3 @@
-pwl.L2.pen.nodewise = function(psi,locs,del.tri,ij.couples.list){
-  require(geometry)
-  tri = del.tri$tri
-  
-  locs.scaled = locs*psi
-  
-  num.cols = dim(locs)[2]
-  
-  grad.g = lapply(1:nrow(tri),function(row.idx){
-    idx = tri[row.idx,]
-    idx.fix = idx[1]
-    idx.rest = idx[-1]
-    coplanar.mat = do.call(rbind,lapply(idx.rest, function(ii){
-      return(locs.scaled[idx.fix,] - locs.scaled[ii,])
-    }))
-    norm.vec = suppressWarnings({
-      c(1,-1)*sapply(c(1:num.cols),function(i){det(coplanar.mat[,-i])})
-    })
-    grad.g.val = norm.vec / sum(norm.vec * locs.scaled[idx.fix,])
-    return(grad.g.val)
-  })
-  grad.g.mat = do.call(rbind,grad.g)
-  pen = sapply(1:nrow(locs), function(l){
-    ij.couples = ij.couples.list[[l]]
-    if(all(is.na(ij.couples))){
-      return(NA)
-    }
-    pen.val.l = apply(ij.couples, 1, function(ij){
-      diff(grad.g.mat[ij,])
-    })
-    pen.val.l = apply(t(pen.val.l)^2,1,sum)
-    return(mean(pen.val.l))
-  })
-  # pen = NULL
-  # for(l in 1:nrow(locs)){
-  #   ij.couples = ij.couple.list[[l]]
-  #   
-  #   pen.val.l = apply(ij.couples, 1, function(ij){
-  #     diff(grad.g.mat[ij,])
-  #   })
-  #   pen.val.l = apply(t(pen.val.l)^2,1,sum)
-  #   pen = c(pen,mean(pen.val.l))
-  # }
-  return(mean(pen,na.rm=T))
-}
-
 pwl.L2.pen.trianglewise = function(psi,locs,del.tri,adj.list){
   require(geometry)
   tri = del.tri$tri
@@ -82,9 +36,8 @@ pwl.L2.pen.trianglewise = function(psi,locs,del.tri,adj.list){
   return(mean(pen))   # should this be "mean" or "sum"?
 }
 
-nll.pwlin.TEST = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, 
-                          locs, fW.fit, joint.fit, pen.const=0, pos.par=TRUE,
-                          ij.couples.list,adj.list){
+nll.pwlin.TEST = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, locs,
+                          adj.list,fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
   
   num.cols = length(w.adj.angles[[1]]$w)
   
@@ -124,42 +77,33 @@ nll.pwlin.TEST = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri,
     llw = -log(num.cols*G.vol) -num.cols*log(rate)
     NLL = -sum(llw)
   }
-  # if(pen.const.L1>0){
-  #   L1.pen.val = pwl.L1.pen(psi=psi,locs=locs)
-  #   NLL = NLL+(pen.const.L1*L1.pen.val)
-  # }
   if(pen.const>0){
-    # L2.pen.val = pwl.L2.pen(psi=psi,locs=locs,del.tri=del.tri)
-    # L2.pen.val = pwl.L2.pen.nodewise(psi=psi,locs=locs,del.tri=del.tri,
-    #                                  ij.couples.list=ij.couples.list)
     L2.pen.val = pwl.L2.pen.trianglewise(psi=psi,locs=locs,del.tri=del.tri,adj.list=adj.list)
     NLL = NLL+(pen.const*L2.pen.val)
   }
   return(NLL)
 }
 
-opt.pwl.TEST = function(NLL, r, r0w, w, locs, 
+opt.pwl.TEST = function(NLL, r, r0w, w, locs, w.adj.angles, del.tri, adj.list,
                         init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
                         joint.fit=FALSE,method="BFGS",
                         pen.const=0,...){
   
-  
-  w.adj.angles = which.adj.angles(w,locs)
+  # w.adj.angles = which.adj.angles(w,locs)
   
   num.cols = length(w.adj.angles[[1]]$w)
-  del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
-  adj.list = adj.DT(locs)
-  ij.couples.list = ij.couples(locs)
-    
+  # del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
+  # adj.list = ij.couples(locs)
+  
   if(fixed.shape & !fW.fit & !joint.fit){
     # fit the conditional radial model only
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 adj.list=adj.list,
                  fW.fit=F,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
-                 ij.couples.list=ij.couples.list,adj.list=adj.list,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = NULL  # didn't model angles
     opt$init.val = init.val
@@ -168,11 +112,11 @@ opt.pwl.TEST = function(NLL, r, r0w, w, locs,
     # fit the radial model and angular model together
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 adj.list=adj.list,
                  fW.fit=T,joint.fit=T,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
-                 ij.couples.list=ij.couples.list,adj.list=adj.list,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = opt$par
     opt$init.val = init.val
@@ -182,11 +126,11 @@ opt.pwl.TEST = function(NLL, r, r0w, w, locs,
     init.val = init.val[-1]  # remove redundancy, fit the first parameter to 1.
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 adj.list=adj.list,
                  fW.fit=T,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
-                 ij.couples.list=ij.couples.list,adj.list=adj.list,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$fW.par = opt$par
     opt$fW.par = c(1,opt$fW.par)  # account for redundancy
@@ -197,13 +141,12 @@ opt.pwl.TEST = function(NLL, r, r0w, w, locs,
     # fit the conditional radial model only
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 adj.list=adj.list,
                  fW.fit=F,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
-                 ij.couples.list=ij.couples.list,adj.list=adj.list,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
-    opt$fW.par = NULL  # didn't model angles
     opt$init.val = init.val
     opt$shape = opt$par[1]
     opt$par = opt$par[-1]
@@ -211,11 +154,11 @@ opt.pwl.TEST = function(NLL, r, r0w, w, locs,
     # fit the radial model and angular model together
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 adj.list=adj.list,
                  fW.fit=T,joint.fit=T,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
-                 ij.couples.list=ij.couples.list,adj.list=adj.list,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
     opt$init.val = init.val
     opt$shape = opt$par[1]
@@ -260,10 +203,10 @@ fit.pwlin.TEST = function(r,w,r0w,locs,
   w.adj.angles = which.adj.angles(angles=w,locs=locs)
   del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
   adj.list = adj.DT(locs)
-  ij.couples.list = ij.couples(locs)
-  
+
   # fixed.pars.idx=NULL
   opt <- opt.pwl.TEST(NLL=nll.pwlin.TEST,r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,
+                 w.adj.angles=w.adj.angles, del.tri=del.tri, adj.list=adj.list,
                  fixed.shape=fixed.shape,fW.fit=fW.fit,joint.fit=joint.fit,
                  pen.const=pen.const,method=method,...)
   
@@ -274,10 +217,13 @@ fit.pwlin.TEST = function(r,w,r0w,locs,
     shape.val = opt$shape
     mle = opt$mle
     
-    lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, fixed.pars,
-                          fixed.pars.idx, fixed.shape, fW.fit, joint.fit, pos.par = TRUE,
+    lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, adj.list=adj.list,
+                          fixed.pars,fixed.pars.idx, fixed.shape, fW.fit, joint.fit, pos.par = TRUE,
                           pen.const=0,del.tri=del.tri){
       
+      # psi.full = numeric(nrow(locs))
+      # psi.full[fixed.pars.idx] = fixed.pars
+      # psi.full[-fixed.pars.idx] = psi
       if(fixed.shape){
         par.full = numeric(nrow(locs))
         par.full[fixed.pars.idx] = fixed.pars
@@ -287,9 +233,15 @@ fit.pwlin.TEST = function(r,w,r0w,locs,
         par.full[fixed.pars.idx+1] = fixed.pars
         par.full[-(fixed.pars.idx+1)] = psi
       }
+      # if(pos.par) {
+      #   if (any(psi.full <= 0)){
+      #     return(1e+11)
+      #   }
+      # }
       
-      return(nll.pwlin(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
-                       locs=locs, fW.fit=fW.fit, joint.fit=joint.fit, pos.par=TRUE,
+      return(nll.pwlin.TEST(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
+                       locs=locs, adj.list=adj.list, fW.fit=fW.fit,
+                       joint.fit=joint.fit, pos.par=TRUE,
                        pen.const=pen.const,del.tri=del.tri,fixed.shape=fixed.shape))
       
     }
@@ -337,7 +289,8 @@ fit.pwlin.TEST = function(r,w,r0w,locs,
       if(!fW.fit & !joint.fit){
         # fit the conditional radial model only
         init.vals = init.val[-fixed.pars.idx]
-        opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+        opt2 = opt.pwl.TEST(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                       w.adj.angles=w.adj.angles, del.tri=del.tri, adj.list=adj.list,
                        fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
                        fixed.shape=fixed.shape,
                        fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
@@ -345,7 +298,8 @@ fit.pwlin.TEST = function(r,w,r0w,locs,
       } else if(fW.fit & joint.fit){
         # fit the radial model and angular model together
         init.vals = init.val[-fixed.pars.idx]
-        opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+        opt2 = opt.pwl.TEST(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                       w.adj.angles=w.adj.angles, del.tri=del.tri, adj.list=adj.list,
                        fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
                        fixed.shape=fixed.shape,
                        fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
@@ -379,5 +333,4 @@ fit.pwlin.TEST = function(r,w,r0w,locs,
     opt$fixed.pars.idx=NULL
     return(opt)
   }
-  
 }
