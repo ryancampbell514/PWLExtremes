@@ -9,6 +9,7 @@ library(mvtnorm)
 library(rgl)
 library(lattice)
 library(PWLExtremes)
+library(dplyr)
 
 usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
                    -0.09606559,-0.2029479,0.974465668,0,
@@ -16,7 +17,7 @@ usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,
                    0,0,0,1)
                  ,4,4,byrow=T)
 
-set.seed(4444)
+set.seed(11)
 n = 5000  # generate n datapoints
 tau=0.95  # the quantile at which we estimate the radial threshold
 
@@ -97,13 +98,9 @@ for(i in 1:nrow(del.tri$tri)){
 
 # fit the models
 model.fit.R.unbounded   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE)
-model.fit.R.unbounded2  = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fixed.shape=FALSE)
 model.fit.R.bounded     = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE)
-model.fit.R.bounded2    = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fixed.shape=FALSE)
 model.fit.RW.unbounded  = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fW.fit=T,joint.fit=T)
-model.fit.RW.unbounded2 = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fW.fit=T,joint.fit=T,fixed.shape=FALSE)
 model.fit.RW.bounded    = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fW.fit=T,joint.fit=T)
-model.fit.RW.bounded2   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fW.fit=T,joint.fit=T,fixed.shape=FALSE)
 model.fit.W             = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=20,fW.fit=T,method="BFGS")
 
 # plot the unit level sets
@@ -122,6 +119,7 @@ view3d(userMatrix = usermat,zoom=0.8)
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.bounded$mle,ref.angles=par.locs)
 g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
 open3d()
+plot3d(x/log(n))
 surface3d(w.mesh[,1]/g.vals.mat,
           w.mesh[,2]/g.vals.mat,
           w.mesh[,3]/g.vals.mat,
@@ -133,6 +131,7 @@ view3d(userMatrix = usermat,zoom=0.8)
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.RW.unbounded$mle,ref.angles=par.locs)
 g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
 open3d()
+plot3d(x/log(n))
 surface3d(w.mesh[,1]/g.vals.mat,
           w.mesh[,2]/g.vals.mat,
           w.mesh[,3]/g.vals.mat,
@@ -144,6 +143,7 @@ view3d(userMatrix = usermat,zoom=0.8)
 g.vals = gfun.pwl(x=w.mesh,par=model.fit.RW.bounded$mle,ref.angles=par.locs)
 g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
 open3d()
+plot3d(x/log(n))
 surface3d(w.mesh[,1]/g.vals.mat,
           w.mesh[,2]/g.vals.mat,
           w.mesh[,3]/g.vals.mat,

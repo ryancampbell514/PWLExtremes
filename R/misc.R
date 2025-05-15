@@ -250,6 +250,72 @@ which.adj.angles = function(angles,locs){
   return(w.adj.angles)
 }
 
+adj.DT = function(par.locs){
+  # given reference angles, return the indices of the neighboring
+  # triangles in the Delaunay triangulation
+
+  num.cols = dim(par.locs)[2]
+  del.tri = PWLExtremes::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)
+  tri = del.tri$tri
+  num.tris = nrow(tri)
+  adj.lst = list(list(NULL))
+  for(k in 1:num.tris){
+    tri.k = tri[k,]
+    adj.idx = NULL
+    for(j in 1:num.tris){
+      if(sum(table(c(tri.k,tri[j,]))==2)==(num.cols-1)){
+        # if this is satisfied, tirangles i and j are neighbours
+        adj.idx = c(adj.idx,j)
+      }
+    }
+    adj.lst[[k]] = sort(adj.idx)
+  }
+  return(adj.lst)
+}
+
+ij.couples = function(par.locs){
+  # given N par locs (nodes), for each node, find the (i,j) pairings in the penalty
+  require(dplyr)
+
+  num.cols = dim(par.locs)[2]
+  tri = PWLExtremes::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)$tri
+  adj.list = adj.DT(par.locs)
+
+  ij.couples.lst = list(list(NULL))  # eventually will be of length N
+  for(l in 1:nrow(par.locs)){
+    #i=20
+    # which triangle has location "i" as a vertex?
+    which.has.l = apply(tri,1,function(ll){
+      l %in% ll
+    })
+    if(sum(which.has.l)==1){
+      # only 1 face, can't compare gradient to another
+      ij.couples.lst[[l]] = NA
+      next
+    } else if(sum(which.has.l)>1){
+      # which.grad.gs = (1:length(grad.g))[which.has.i]
+      idx.w.l = c(1:length(adj.list))[which.has.l]
+      adj.list.l = adj.list[idx.w.l]
+      names(adj.list.l) = idx.w.l
+      adj.list.l = lapply(adj.list.l, function(vec){
+        return(vec[vec %in% idx.w.l])
+      })
+      ij.couples = lapply(1:length(idx.w.l), function(idx){
+        idx.w.l.idx = idx.w.l[idx]
+        lapply(adj.list.l[[idx]], function(vec){
+          lapply(vec,function(vec.i){
+            return(sort(c(idx.w.l.idx,vec.i)))
+          })
+        })
+      })
+      ij.couples = matrix(unlist(ij.couples),ncol=2,byrow=T)
+      ij.couples = unname(as.matrix(distinct(as.data.frame(ij.couples,col.names=NULL))))
+      ij.couples.lst[[l]] = ij.couples
+    }
+  }
+  return(ij.couples.lst)
+}
+
 G.vol = function(gauge.pars,par.locs){
   num.cols = dim(par.locs)[2]
 

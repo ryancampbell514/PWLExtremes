@@ -475,24 +475,7 @@ get_pen_const_2d = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
 
 # general d-dimensional model fitting for when w is on the simplex.
 
-# pwl.L1.pen = function(psi,locs){
-#   # Experimental L1 penalty
-#
-#   require(geometry)
-#   pen.vals = sapply(1:length(psi), function(i){
-#     # print(locs[i,])
-#     psi.i = psi[i]
-#     locs.i = locs[i,]
-#     psi.rest = psi[-i]
-#     locs.rest = locs[-i,]
-#     suppressWarnings({
-#       g.val.i = gfun.pwl(x=locs.i,par = psi.rest,ref.angles=locs.rest)
-#     })
-#     return(abs(psi.i - (1/g.val.i)))
-#   })
-#   return(mean(pen.vals,na.rm=T))  # used to be sum
-# }
-pwl.L2.pen = function(psi,locs,del.tri){
+pwl.L2.pen = function(psi,locs,del.tri,ij.couples.list){
   require(geometry)
   tri = del.tri$tri
 
@@ -507,72 +490,29 @@ pwl.L2.pen = function(psi,locs,del.tri){
     coplanar.mat = do.call(rbind,lapply(idx.rest, function(ii){
       return(locs.scaled[idx.fix,] - locs.scaled[ii,])
     }))
-    # norm.vec = c(det(coplanar.mat[,-1]),-det(coplanar.mat[,-2]),det(coplanar.mat[,-3]),-det(coplanar.mat[,-4]))
     norm.vec = suppressWarnings({
       c(1,-1)*sapply(c(1:num.cols),function(i){det(coplanar.mat[,-i])})
     })
     grad.g.val = norm.vec / sum(norm.vec * locs.scaled[idx.fix,])
     return(grad.g.val)
   })
-  # pen = 0
-  # idx.vecs = NULL
-  # for(i in 1:nrow(locs)){
-  #   which.has.i = apply(tri,1,function(ii){
-  #     i %in% ii
-  #   })
-  #   if(sum(which.has.i)==1){
-  #     next  # only 1 face, can't compare gradient to another
-  #   } else if(sum(which.has.i)>1){
-  #     which.grad.gs = (1:length(grad.g))[which.has.i]
-  #     idx.combs = combn(1:length(which.grad.gs),2)
-  #     idx.vec = do.call(rbind,lapply(1:ncol(idx.combs),function(i.col){
-  #       return(sort(which.grad.gs[idx.combs[,i.col]]))
-  #     }))
-  #     idx.vecs = rbind(idx.vecs,idx.vec)
-  #   }
-  # }
-  # idx.vecs = idx.vecs[!duplicated(idx.vecs), ]
-  # grad.g.mat = do.call(rbind,grad.g)
-  # pen = apply(idx.vecs,1,function(ii){
-  #   # print(ii)
-  #   pp = diff(grad.g.mat[ii,])
-  #   # print(pp)
-  #   # print("")
-  #   return(sum(pp^2))  # should this be "mean" or "sum"? sum is the 2-norm of the differences in gradient
-  # })
-  # return(mean(pen))   # should this be "mean" or "sum"?
-
-  # idx.vecs = NULL
-  pen = NULL
   grad.g.mat = do.call(rbind,grad.g)
-  for(i in 1:nrow(locs)){
-    #i=20
-    # which triangle has location "i" as a vertex?
-    which.has.i = apply(tri,1,function(ii){
-      i %in% ii
-    })
-    if(sum(which.has.i)==1){
-      # only 1 face, can't compare gradient to another
-      next
-    } else if(sum(which.has.i)>1){
-      # which.grad.gs = (1:length(grad.g))[which.has.i]
-      idx.combs = combn(1:sum(which.has.i),2)
-      diffs = NULL
-      for(jk.idx in 1:ncol(idx.combs)){
-        j = idx.combs[1,jk.idx]
-        k = idx.combs[2,jk.idx]
-        if(sum(table(c(tri[which.has.i,][j,],tri[which.has.i,][k,]))==2)==(num.cols-1)){  # need d-1 common vertices/reference angles
-          diffs = rbind(diffs,diff(grad.g.mat[which.has.i,][c(j,k),]))
-        }
-      }
-      pen.val.i = mean(apply(diffs^2,1,sum)) # sum of squared differences between adjacent gradients
-      pen = c(pen,pen.val.i)
+  pen = sapply(1:nrow(locs), function(l){
+    ij.couples = ij.couples.list[[l]]
+    if(all(is.na(ij.couples))){
+      return(NA)
     }
-  }
-  return(mean(pen))   # should this be "mean" or "sum"?
+    pen.val.l = apply(ij.couples, 1, function(ij){
+      diff(grad.g.mat[ij,])
+    })
+    pen.val.l = apply(t(pen.val.l)^2,1,sum)
+    return(mean(pen.val.l))
+  })
+  return(mean(pen,na.rm=T))
 }
 
-nll.pwlin = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, locs, fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
+nll.pwlin = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, locs,
+                     ij.couples.list,fW.fit, joint.fit, pen.const=0, pos.par=TRUE){
 
   num.cols = length(w.adj.angles[[1]]$w)
 
@@ -593,12 +533,6 @@ nll.pwlin = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, locs, fW.f
     }
   }
 
-  # # REMOVE THIS...
-  # if (any(psi > 5)){
-  #   return(1e+11)
-  # }
-
-
   if(fW.fit & joint.fit){
     rate <- pwlin.g.vals(w.adj.angles=w.adj.angles,par=psi,par.locs=locs)
     ll1 <- dgamma(r, shape = shape, rate = rate, log = T)
@@ -618,39 +552,29 @@ nll.pwlin = function(psi, r, r0w, w.adj.angles, fixed.shape, del.tri, locs, fW.f
     llw = -log(num.cols*G.vol) -num.cols*log(rate)
     NLL = -sum(llw)
   }
-  # if(pen.const.L1>0){
-  #   L1.pen.val = pwl.L1.pen(psi=psi,locs=locs)
-  #   NLL = NLL+(pen.const.L1*L1.pen.val)
-  # }
   if(pen.const>0){
-    L2.pen.val = pwl.L2.pen(psi=psi,locs=locs,del.tri=del.tri)
+    L2.pen.val = pwl.L2.pen(psi=psi,locs=locs,del.tri=del.tri,ij.couples.list=ij.couples.list)
     NLL = NLL+(pen.const*L2.pen.val)
   }
-  # print(psi)
-  # print(NLL)
   return(NLL)
 }
 
-opt.pwl = function(NLL, r, r0w, w, locs,
+opt.pwl = function(NLL, r, r0w, w, locs, w.adj.angles, del.tri, ij.couples.list,
                      init.val=NULL, fixed.shape=TRUE, fW.fit=FALSE,
                      joint.fit=FALSE,method="BFGS",
                      pen.const=0,...){
 
-  # t1 = Sys.time()
-
-  # if(is.null(init.val)){
-  #   init.val = rep(1,nrow(locs))
-  # }
-
-  w.adj.angles = which.adj.angles(w,locs)
+  # w.adj.angles = which.adj.angles(w,locs)
 
   num.cols = length(w.adj.angles[[1]]$w)
-  del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
+  # del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
+  # ij.couples.list = ij.couples(locs)
 
   if(fixed.shape & !fW.fit & !joint.fit){
     # fit the conditional radial model only
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 ij.couples.list=ij.couples.list,
                  fW.fit=F,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
@@ -663,6 +587,7 @@ opt.pwl = function(NLL, r, r0w, w, locs,
     # fit the radial model and angular model together
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 ij.couples.list=ij.couples.list,
                  fW.fit=T,joint.fit=T,
                  pen.const=pen.const,
                  del.tri=del.tri,
@@ -676,14 +601,12 @@ opt.pwl = function(NLL, r, r0w, w, locs,
     init.val = init.val[-1]  # remove redundancy, fit the first parameter to 1.
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 ij.couples.list=ij.couples.list,
                  fW.fit=T,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
-    # opt$fW.par = opt$par
-    # opt$fW.par = c(1,opt$fW.par)  # account for redundancy
-    # opt$par = NULL
     opt$fW.par = opt$par
     opt$fW.par = c(1,opt$fW.par)  # account for redundancy
     opt$par = NULL
@@ -693,15 +616,12 @@ opt.pwl = function(NLL, r, r0w, w, locs,
     # fit the conditional radial model only
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 ij.couples.list=ij.couples.list,
                  fW.fit=F,joint.fit=F,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
-    # opt$fW.par = NULL  # didn't model angles
-    # opt$init.val = init.val
-    # opt$shape=num.cols
-    opt$fW.par = NULL  # didn't model angles
     opt$init.val = init.val
     opt$shape = opt$par[1]
     opt$par = opt$par[-1]
@@ -709,24 +629,17 @@ opt.pwl = function(NLL, r, r0w, w, locs,
     # fit the radial model and angular model together
     opt <- optim(NLL, par = init.val, r = r,
                  r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
+                 ij.couples.list=ij.couples.list,
                  fW.fit=T,joint.fit=T,
                  pen.const=pen.const,
                  del.tri=del.tri,
                  fixed.shape=fixed.shape,
                  control=list(maxit=1e6,reltol=1e-5),method=method,...)
-    # opt$fW.par = opt$par
-    # opt$init.val = init.val
-    # opt$shape=num.cols
     opt$init.val = init.val
     opt$shape = opt$par[1]
     opt$par = opt$par[-1]
     opt$fW.par = opt$par
   }
-  # else if(!fixed.shape){
-  #   stop("fitting shape not implemented.")
-  # }
-
-  # t2 = Sys.time()
 
   opt$init.val = init.val#c(3,init.val)
   opt$aic = 2*(opt$value + length(opt$par))
@@ -764,9 +677,11 @@ fit.pwlin = function(r,w,r0w,locs,
 
   w.adj.angles = which.adj.angles(angles=w,locs=locs)
   del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
+  ij.couples.list = ij.couples(locs)
 
   # fixed.pars.idx=NULL
   opt <- opt.pwl(NLL=nll.pwlin,r=r,w=w,r0w=r0w,locs=locs,init.val=init.val,
+                 w.adj.angles=w.adj.angles, del.tri=del.tri, ij.couples.list=ij.couples.list,
                  fixed.shape=fixed.shape,fW.fit=fW.fit,joint.fit=joint.fit,
                  pen.const=pen.const,method=method,...)
 
@@ -777,8 +692,8 @@ fit.pwlin = function(r,w,r0w,locs,
     shape.val = opt$shape
     mle = opt$mle
 
-    lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, fixed.pars,
-                          fixed.pars.idx, fixed.shape, fW.fit, joint.fit, pos.par = TRUE,
+    lik.custom = function(psi, r, r0w, w.adj.angles, locs = locs, ij.couples.list=ij.couples.list,
+                          fixed.pars,fixed.pars.idx, fixed.shape, fW.fit, joint.fit, pos.par = TRUE,
                           pen.const=0,del.tri=del.tri){
 
       # psi.full = numeric(nrow(locs))
@@ -800,7 +715,8 @@ fit.pwlin = function(r,w,r0w,locs,
       # }
 
       return(nll.pwlin(psi=par.full,r=r,r0w=r0w,w.adj.angles=w.adj.angles,
-                       locs=locs, fW.fit=fW.fit, joint.fit=joint.fit, pos.par=TRUE,
+                       locs=locs, ij.couples.list=ij.couples.list, fW.fit=fW.fit,
+                       joint.fit=joint.fit, pos.par=TRUE,
                        pen.const=pen.const,del.tri=del.tri,fixed.shape=fixed.shape))
 
     }
@@ -848,12 +764,8 @@ fit.pwlin = function(r,w,r0w,locs,
       if(!fW.fit & !joint.fit){
         # fit the conditional radial model only
         init.vals = init.val[-fixed.pars.idx]
-        # opt <- optim(lik.custom, par = init.vals, r = r,
-        #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
-        #              fW.fit=F,joint.fit=F,pen.const=pen.const,del.tri=del.tri,
-        #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
-        #              control=list(maxit=1e6,reltol=1e-5),method=method,...)
         opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                      w.adj.angles=w.adj.angles, del.tri=del.tri, ij.couples.list=ij.couples.list,
                       fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
                       fixed.shape=fixed.shape,
                       fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
@@ -861,12 +773,8 @@ fit.pwlin = function(r,w,r0w,locs,
       } else if(fW.fit & joint.fit){
         # fit the radial model and angular model together
         init.vals = init.val[-fixed.pars.idx]
-        # opt <- optim(lik.custom, par = init.vals, r = r,
-        #              r0w = r0w, w.adj.angles=w.adj.angles, locs=locs,
-        #              fW.fit=T,joint.fit=T,pen.const=pen.const,del.tri=del.tri,
-        #              fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,
-        #              control=list(maxit=1e6,reltol=1e-5),method=method,...)
         opt2 = opt.pwl(NLL=lik.custom,r=r,w=w,r0w=r0w,locs=locs,init.val=init.vals,
+                       w.adj.angles=w.adj.angles, del.tri=del.tri, ij.couples.list=ij.couples.list,
                        fW.fit=fW.fit,joint.fit=joint.fit,pen.const=pen.const,method=method,
                        fixed.shape=fixed.shape,
                        fixed.pars=mle[fixed.pars.idx], fixed.pars.idx=fixed.pars.idx,...)
@@ -900,18 +808,7 @@ fit.pwlin = function(r,w,r0w,locs,
     opt$fixed.pars.idx=NULL
     return(opt)
   }
-
-  # return(list(mle=mle,
-  #             fixed.pars.idx=fixed.pars.idx))
-
-  # t2 = Sys.time()
-
-  # return(list(mle = mle, fW.mle = opt$fW.par, shape=dim(w)[2],
-  #             nllh = opt$value, convergence = opt$conv,
-  #             aic = opt$aic, init.val = opt$init.val,
-  #             info = t2-t1))
 }
-
 
 get_pen_const = function(r,w,r0w,locs,init.val,fW.fit=FALSE,joint.fit=FALSE){
   if(fW.fit & !joint.fit){
