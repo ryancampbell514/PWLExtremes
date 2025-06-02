@@ -221,6 +221,8 @@ G.vol.2d = function(gauge.pars,par.locs,marg="pos"){
 ###############################################################################
 
 which.adj.angles = function(angles,locs){
+  # For each angle, where does it live in the partition of the simplex?
+
   require(geometry)
 
   # angles are d-dimensional
@@ -238,14 +240,15 @@ which.adj.angles = function(angles,locs){
   num.cols = dim(locs)[2]
 
   del.tri = PWLExtremes::delaunayn(p=locs[,-num.cols], output.options=TRUE)
-  w.adj.angles = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
+  tsearchn.output = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
                           t=del.tri$tri,
                           xi=matrix(angles[,-num.cols],ncol=num.cols-1))
-  locs.idx =w.adj.angles$idx
+  locs.idx = tsearchn.output$idx
   w.adj.angles = lapply(c(1:nrow(angles)),function(i){
-    return(list(w=angles[i,],                                           # the angle
-                loc.idx=del.tri$tri[locs.idx[i],],
-                vertices=locs[del.tri$tri[locs.idx[i],],]))  # the enclosing vertices
+    return(list(w=angles[i,],                                # the angle of interest, w
+                tri.idx=locs.idx[i],                         # the index of the triangle where w belongs
+                loc.idx=del.tri$tri[locs.idx[i],],           # the indices of the enclosing vertices
+                vertices=locs[del.tri$tri[locs.idx[i],],]))  # the enclosing vertices (a matrix of size d x d)
   })
   return(w.adj.angles)
 }
