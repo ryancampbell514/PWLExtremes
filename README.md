@@ -20,3 +20,4 @@ install.packages(c("geometry","evd","mvtnorm","rgl","lattice"))
 # install.packages("remotes")
 remotes::install_github("ryancampbell514/PWLExtremes")
 ```
+
