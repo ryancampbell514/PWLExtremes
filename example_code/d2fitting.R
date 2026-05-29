@@ -7,8 +7,6 @@ library(geometricMVE)
 library(evd)
 library(mvtnorm)
 
-library(PWLExtremes)
-
 set.seed(4444)
 n = 5000  # generate n datapoints
 tau=0.95  # the quantile at which we estimate the radial threshold

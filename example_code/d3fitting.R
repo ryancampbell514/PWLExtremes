@@ -8,7 +8,6 @@ library(evd)
 library(mvtnorm)
 library(rgl)
 library(lattice)
-library(PWLExtremes)
 library(dplyr)
 
 usermat = matrix(c(-0.91820633,0.3960208,-0.008041704,0,

@@ -2,9 +2,9 @@
 rm(list = ls())
 
 library(geometry)
+library(geometricMVE)
 library(rgl)
 library(openair)
-library(PWLExtremes)
 
 load("~/GitHub/PWLExtremes/ds_4d_urban.Rdata")
 head(ds.exp.4d)
