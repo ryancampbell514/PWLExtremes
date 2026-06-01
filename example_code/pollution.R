@@ -4,16 +4,19 @@ rm(list = ls())
 library(geometry)
 library(geometricMVE)
 library(rgl)
-library(openair)
+# library(openair)
 
-load("~/GitHub/PWLExtremes/ds_4d_urban.Rdata")
+source(file.path("PATH TO PWLExtremes","extra-functions.R"))
+
+load(file.path("PATH TO PWLExtremes","ds_4d_urban.Rdata"))
 head(ds.exp.4d)
 
 r<-apply(ds.exp.4d,1,sum)
 w<-ds.exp.4d/r
 
-tau=0.075
-qr=radial.quants.L1.KDE(r=r,w=w,tau=tau,mesh.eval=T,ker="Gaussian")
+tau=0.70
+bww=0.075
+qr=geometricMVE::fit.thresh(r=r,w=w,tau=tau,bww=bww)
 r0w = qr$r0w
 excind<-r>r0w
 rexc<-r[excind]
@@ -52,29 +55,23 @@ W.fit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init/init[1],
 
 #############################################################################
 
+# Plot the threshold projections
+nms = colnames(w)
+plotfittedthresh.3dproj(qr, which.proj = 1, xlab = nms[2], ylab = nms[3], zlab = nms[4])
+plotfittedthresh.3dproj(qr, which.proj = 2, xlab = nms[1], ylab = nms[3], zlab = nms[4])
+plotfittedthresh.3dproj(qr, which.proj = 3, xlab = nms[1], ylab = nms[2], zlab = nms[4])
+plotfittedthresh.3dproj(qr, which.proj = 4, xlab = nms[1], ylab = nms[2], zlab = nms[3])
+
+#############################################################################
+
 # Plot the gauge function projections
-
-proj.g.fn = function(gfun,w,which.w,nm,...){
-  # gfun -> gauge that takes in 4-dim vectors
-  # w -> 3-min input
-  # which.w -> which index to take min over
-
-  w.inp = matrix(NA,nrow=nm,ncol=4)
-  w.inp[,-which.w] = matrix(as.numeric(w),ncol=3,nrow=nm,byrow=T)
-  w.inp[,which.w] = seq(0,1.3,length.out=nm)
-
-  return(min(gfun(w.inp,...)))
-}
 
 nmesh=50
 wpts<-expand.grid(seq(0,1,len=nmesh),seq(0,1,len=nmesh))
 wpts = cbind(wpts,1-apply(wpts,1,sum))
 
-t1 = Sys.time()
 gvals.est1 = apply(wpts,1,proj.g.fn,gfun=gfun.pwl,which.w=1,nm=nmesh,par=mle,ref.angles=par.locs)
 gvals.est1.mat = matrix(gvals.est1,nmesh,nmesh)
-t2 = Sys.time()
-print(t2-t1)
 
 gvals.est2 = apply(wpts,1,proj.g.fn,gfun=gfun.pwl,which.w=2,nm=nmesh,par=mle,ref.angles=par.locs)
 gvals.est2.mat = matrix(gvals.est2,nmesh,nmesh)
