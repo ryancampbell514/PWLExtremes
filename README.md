@@ -19,9 +19,9 @@ install.packages(c("geometry","evd","mvtnorm","rgl","lattice"))
 
 # source in some useful functions
 
-There are some functions requries to reproduce results in the paper, but are not yet available in the geometricMVE package. To use them, be sure to source the functions in extra-functions.R
+There are some functions requries to reproduce results in the paper, but are not yet available in the geometricMVE package. Mainly functions associated with threshold and limit set projections, described in Section 4.4 of the manuscript. To use these functions, be sure to source the functions in extra-functions.R
 
 ``` r
-source("extra-functions.R")
+source(file.path("PATH TO PWLExtremes","extra-functions.R"))
 ```
 
