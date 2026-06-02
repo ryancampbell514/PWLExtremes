@@ -17,6 +17,7 @@ w<-ds.exp.4d/r
 tau=0.70
 bww=0.075
 qr=geometricMVE::fit.thresh(r=r,w=w,tau=tau,bww=bww)
+qr2=fit.thresh(r=r,w=w,tau=tau,bww=NULL)  # from extra-functions.R, for adaptive bww
 r0w = qr$r0w
 excind<-r>r0w
 rexc<-r[excind]
@@ -58,6 +59,7 @@ W.fit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init/init[1],
 # Plot the threshold projections
 nms = colnames(w)
 plotfittedthresh.3dproj(qr, which.proj = 1, xlab = nms[2], ylab = nms[3], zlab = nms[4])
+plotfittedthresh.3dproj(qr2, which.proj = 1, xlab = nms[2], ylab = nms[3], zlab = nms[4])
 plotfittedthresh.3dproj(qr, which.proj = 2, xlab = nms[1], ylab = nms[3], zlab = nms[4])
 plotfittedthresh.3dproj(qr, which.proj = 3, xlab = nms[1], ylab = nms[2], zlab = nms[4])
 plotfittedthresh.3dproj(qr, which.proj = 4, xlab = nms[1], ylab = nms[2], zlab = nms[3])

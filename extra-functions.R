@@ -76,7 +76,7 @@ plotfittedthresh.3dproj=function(thresh.fit, resolution=30, add=FALSE, which.pro
       
       sum(w.inp) / KDE.thresh.eval.RC(wpts = matrix(w.inp/sum(w.inp),nrow=1),
                                       r = thresh.fit$r, w=thresh.fit$w,
-                                      bww=thresh.fit$bww)
+                                      bww=thresh.fit$bww, tau=thresh.fit$tau)
     }
     if(d==4){
       opt<-optimize(dummy,interval=c(0,upper))
