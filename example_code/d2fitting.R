@@ -29,7 +29,7 @@ r<-x[,1]+x[,2]
 w<-x[,1]/r
 
 # estimate the threshold
-qr = radial.quants.L1.KDE.2d(r,w,tau=tau,bww=0.05,bwr=0.05,ker="Gaussian")
+qr = fit.thresh(r,w,tau=tau,bww=0.05)
 
 # keep the exceedances
 r0w=qr$r0w
@@ -41,29 +41,33 @@ r0w<-r0w[excind]
 
 # plot the KDE threshold
 par(mfrow=c(1,1),pty="s")
-plot(x,pch=20,col="grey",xlim=c(0,11),ylim=c(0,11))
-lines(cbind(wpts,1-wpts) * qr$r.tau.wpts,lwd=2,col="red")
+plotfittedthresh(qr)
 
 # Fit the models
 par.locs = seq(0,1,length.out=11)
-model.fit.R.unbounded           = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F)
-model.fit.R.unbounded2          = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixed.shape = F)
-model.fit.R.unbounded.pensearch = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F)
-model.fit.R.bounded             = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T)
-model.fit.R.bounded2            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixed.shape = F)
-model.fit.RW.unbounded          = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T)
-model.fit.RW.unbounded2         = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,fixed.shape = F)
-model.fit.RW.bounded            = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T)
-model.fit.RW.bounded2           = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",fW.fit=T,joint.fit=T,bound.fit=T,fixed.shape = F)
-model.fit.W                     = fit.pwlin.2d(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=NULL,fW.fit=T,method="BFGS")
+par.locs = seq(0,1,length.out=11)
+model.fit.R.unbounded           = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixshape = T)
+model.fit.R.unbounded2          = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixshape = F)
+model.fit.R.unbounded.pensearch = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F,fixshape = T)
+model.fit.R.bounded             = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixshape = T)
+model.fit.R.bounded2            = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixshape = F)
+model.fit.RW.unbounded          = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",W.fit=T,joint.fit=T,fixshape = T)
+model.fit.RW.unbounded2         = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",W.fit=T,joint.fit=T,fixshape = F)
+model.fit.RW.bounded            = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",W.fit=T,joint.fit=T,bound.fit=T,fixshape = T)
+model.fit.RW.bounded2           = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",W.fit=T,joint.fit=T,bound.fit=T,fixshape = F)
+model.fit.W                     = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=20,W.fit=T,method="BFGS")
 
 # plot the unit level sets
-par(mfrow=c(2,2),pty="s")
-plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.R.unbounded$mle,ref.angles=par.locs),type="l")
-plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.R.unbounded.pensearch$mle,ref.angles=par.locs),type="l")
-plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.R.bounded$mle,ref.angles=par.locs),type="l")
-plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.RW.unbounded$mle,ref.angles=par.locs),type="l")
-plot(cbind(wpts,1-wpts)/gfun.2d(cbind(wpts,1-wpts),par=model.fit.RW.bounded$mle,ref.angles=par.locs),type="l")
+par(mfrow=c(3,3),pty="s")
+plotfittedgauge(model.fit.R.unbounded)
+plotfittedgauge(model.fit.R.unbounded2)
+plotfittedgauge(model.fit.R.unbounded.pensearch)
+plotfittedgauge(model.fit.R.bounded)
+plotfittedgauge(model.fit.R.bounded2)
+plotfittedgauge(model.fit.RW.unbounded)
+plotfittedgauge(model.fit.RW.unbounded2)
+plotfittedgauge(model.fit.RW.bounded)
+plotfittedgauge(model.fit.RW.bounded2)
 
 # plot the angular models
 par(mfrow=c(1,3),pty="s")
@@ -76,15 +80,7 @@ lines(wpts, gfun.2d(cbind(wpts,1-wpts),par=model.fit.RW.bounded$mle,ref.angles=p
 
 # generate some data from 1 of the fitted models
 n1 = 50000
-gfun = function(w,par,locs=par.locs){
-  gfun.2d(x=w,par=par,ref.angles=locs)
-}
-xstar = sim.2d.cond(w=wexc, r0w=r0w, nsim=n1,k=1,gfun=gfun,par=model.fit.R.unbounded$mle)
-# xstar = sim.2d.cond(w=wexc, r0w=r0w, nsim=n1,k=1,gfun=gfun,par=model.fit.R.bounded$mle)
-# xstar = sim.2d.joint(nsim=n1,k.vals=1,gfun=gfun,par=model.fit.R.unbounded$mle,fW.par=model.fit.W$fW.mle,par.locs=par.locs,r=r,w=w)[[1]]
-# xstar = sim.2d.joint(nsim=n1,k.vals=1,gfun=gfun,par=model.fit.R.bounded$mle,fW.par=model.fit.W$fW.mle,par.locs=par.locs,r=r,w=w)[[1]]
-# xstar = sim.2d.joint(nsim=n1,k.vals=1,gfun=gfun,par=model.fit.RW.unbounded$mle,fW.par=model.fit.RW.unbounded$mle,par.locs=par.locs,r=r,w=w)[[1]]
-# xstar = sim.2d.joint(nsim=n1,k.vals=1,gfun=gfun,par=model.fit.RW.unbounded$mle,fW.par=model.fit.RW.unbounded$mle,par.locs=par.locs,r=r,w=w)[[1]]
+xstar = sim.geometric(fit=model.fit.R.unbounded,nsim=n1,k=1,)
 
 # define a region in which to estimate probabilities
 x11<-10

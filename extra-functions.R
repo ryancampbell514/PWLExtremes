@@ -428,245 +428,245 @@ checkfn = function(quant,inp){
 
 # d=2 pwl gauge function def
 
-# Given angles and reference angles, return a list containing the angles and
-# the indices of reference angles
-which.adj.angles.2d = function(angles,locs,norm=NULL,marg="pos"){
-  # w         -> a vector or 2-column matrix of angles in the d=1 unit simplex
-  # locs      -> vector of length Nmesh, the reference angles in the d=1 unit simplex
-  
-  n.pars = length(locs)
-  
-  if(marg=="pos"){
-    lst.val = lapply(angles,function(w){
-      for(j in 1:(n.pars-1)){
-        if(w>=locs[j] & w<=locs[j+1]){
-          break
-        }
-      }
-      return(list(w=w,
-                  idx.locs=c(j,j+1)))
-    })
-  } else if(marg=="Rd"){
-    lst.val = lapply(angles,function(w){
-      for(j in 1:(n.pars)){
-        idx.low = j
-        idx.up = j+1
-        val.low = locs[j]
-        val.up = ifelse(idx.up>length(locs),-2,locs[j+1])
-        if(w>=val.low & w<=val.up){
-          break
-        }
-      }
-      idx.up =  ifelse(idx.up>length(locs),1,idx.up)
-      return(list(w=w,
-                  idx.locs=c(idx.low,idx.up)))
-    })
-  }
-  return(lst.val)
-}
+# # Given angles and reference angles, return a list containing the angles and
+# # the indices of reference angles
+# which.adj.angles.2d = function(angles,locs,norm=NULL,marg="pos"){
+#   # w         -> a vector or 2-column matrix of angles in the d=1 unit simplex
+#   # locs      -> vector of length Nmesh, the reference angles in the d=1 unit simplex
+#   
+#   n.pars = length(locs)
+#   
+#   if(marg=="pos"){
+#     lst.val = lapply(angles,function(w){
+#       for(j in 1:(n.pars-1)){
+#         if(w>=locs[j] & w<=locs[j+1]){
+#           break
+#         }
+#       }
+#       return(list(w=w,
+#                   idx.locs=c(j,j+1)))
+#     })
+#   } else if(marg=="Rd"){
+#     lst.val = lapply(angles,function(w){
+#       for(j in 1:(n.pars)){
+#         idx.low = j
+#         idx.up = j+1
+#         val.low = locs[j]
+#         val.up = ifelse(idx.up>length(locs),-2,locs[j+1])
+#         if(w>=val.low & w<=val.up){
+#           break
+#         }
+#       }
+#       idx.up =  ifelse(idx.up>length(locs),1,idx.up)
+#       return(list(w=w,
+#                   idx.locs=c(idx.low,idx.up)))
+#     })
+#   }
+#   return(lst.val)
+# }
 
 
-# given 3 parameters (par) located at 3 reference angles (par.locs),
-# return the gauge function value at the point xyz
-gfun.simple.d2pwlin.L1 = function(w,par,par.locs){
-  # xyz      = 
-  # par      = vector of length 2
-  # par.locs = vector of length 2
-  
-  r1 = par[1]
-  r2 = par[2]
-  
-  w.sort = sort(par.locs)
-  w.low = w.sort[1]
-  w.up = w.sort[2]
-  
-  dx = r2*w.up - r1*w.low
-  dy = r2*(1-w.up) - r1*(1-w.low)
-  a = dy/dx
-  b = r1*(1-w.low - a*w.low)
-  if(dx==0){
-    return(w/(r1*w.low))
-  } 
-  else{
-    return((1-w-(a*w))/b)
-  }
-}
+# # given 3 parameters (par) located at 3 reference angles (par.locs),
+# # return the gauge function value at the point xyz
+# gfun.simple.d2pwlin.L1 = function(w,par,par.locs){
+#   # xyz      = 
+#   # par      = vector of length 2
+#   # par.locs = vector of length 2
+#   
+#   r1 = par[1]
+#   r2 = par[2]
+#   
+#   w.sort = sort(par.locs)
+#   w.low = w.sort[1]
+#   w.up = w.sort[2]
+#   
+#   dx = r2*w.up - r1*w.low
+#   dy = r2*(1-w.up) - r1*(1-w.low)
+#   a = dy/dx
+#   b = r1*(1-w.low - a*w.low)
+#   if(dx==0){
+#     return(w/(r1*w.low))
+#   } 
+#   else{
+#     return((1-w-(a*w))/b)
+#   }
+# }
 
 
-pwlin.g.vals.2d = function(w.adj.angles,par,par.locs){
-  # w.adj.angles  -> output of which.adj.angles()
-  # par           -> parameters at reference angles
-  # par.locs      -> 3-column matrix of reference angles.
-  
-  sapply(w.adj.angles, function(lst){
-    which.angles = lst$idx.locs
-    return(gfun.simple.d2pwlin.L1(w=lst$w,par=par[which.angles],par.locs=par.locs[which.angles]))
-  })
-}
+# pwlin.g.vals.2d = function(w.adj.angles,par,par.locs){
+#   # w.adj.angles  -> output of which.adj.angles()
+#   # par           -> parameters at reference angles
+#   # par.locs      -> 3-column matrix of reference angles.
+#   
+#   sapply(w.adj.angles, function(lst){
+#     which.angles = lst$idx.locs
+#     return(gfun.simple.d2pwlin.L1(w=lst$w,par=par[which.angles],par.locs=par.locs[which.angles]))
+#   })
+# }
 
-gfun.2d = function(x, par, ref.angles){
-  # x-> matrix of 2 columns
-  if(is.null(dim(x)) & length(x)==1){
-    x = cbind(x,1-x)
-  }
-  if(is.null(dim(x)) & length(x)>1){
-    x = matrix(x,nrow=1)
-  }
-  
-  rad.inp = apply(x,1,sum)
-  angle.inp = x[,1] / rad.inp
-  
-  w.adj.angles = which.adj.angles.2d(angles=angle.inp, locs=ref.angles)
-  
-  gval = rad.inp*pwlin.g.vals.2d(w.adj.angles=w.adj.angles,par=par,par.locs=ref.angles)
-  
-  return(gval)
-}
+# gfun.2d = function(x, par, ref.angles){
+#   # x-> matrix of 2 columns
+#   if(is.null(dim(x)) & length(x)==1){
+#     x = cbind(x,1-x)
+#   }
+#   if(is.null(dim(x)) & length(x)>1){
+#     x = matrix(x,nrow=1)
+#   }
+#   
+#   rad.inp = apply(x,1,sum)
+#   angle.inp = x[,1] / rad.inp
+#   
+#   w.adj.angles = which.adj.angles.2d(angles=angle.inp, locs=ref.angles)
+#   
+#   gval = rad.inp*pwlin.g.vals.2d(w.adj.angles=w.adj.angles,par=par,par.locs=ref.angles)
+#   
+#   return(gval)
+# }
 
 ######################################################################
 
 
 # plot the 3-d projection of the gauge function
 
-gfun.simple.pwlin = function(xyz,par,par.locs){
-  # par      = in R^3_+
-  # par.locs = angles (in the simplex) where the parameters are location
-  
-  num.cols = dim(par.locs)[2]
-  
-  coplanar.mat = do.call(rbind,lapply(c(1:num.cols)[-1],function(i){
-    (par[1]*par.locs[1,])-(par[i]*par.locs[i,])
-  }))
-  norm.vec = suppressWarnings({
-    c(1,-1)*sapply(c(1:num.cols),function(i){det(coplanar.mat[,-i])})
-  })
-  sum(norm.vec * xyz) / sum(norm.vec * par[1] * par.locs[1,])
-}
+# gfun.simple.pwlin = function(xyz,par,par.locs){
+#   # par      = in R^3_+
+#   # par.locs = angles (in the simplex) where the parameters are location
+#   
+#   num.cols = dim(par.locs)[2]
+#   
+#   coplanar.mat = do.call(rbind,lapply(c(1:num.cols)[-1],function(i){
+#     (par[1]*par.locs[1,])-(par[i]*par.locs[i,])
+#   }))
+#   norm.vec = suppressWarnings({
+#     c(1,-1)*sapply(c(1:num.cols),function(i){det(coplanar.mat[,-i])})
+#   })
+#   sum(norm.vec * xyz) / sum(norm.vec * par[1] * par.locs[1,])
+# }
 
-# evaluating the gauge at a set of angles, returns a vector
-pwlin.g.vals = function(w.adj.angles,par,par.locs){
-  # w.adj.angles  -> output of which.adj.angles()
-  # par           -> parameters at reference angles
-  # par.locs      -> 3-column matrix of reference angles.
-  
-  sapply(w.adj.angles, function(lst){
-    which.angles = lst$loc.idx
-    if(any(is.na(lst$w)) | all(which.angles==0) | any(lst$w<0) | any(is.na(which.angles))){  # if angle is not in the positive orthant OR if angle lies on line
-      return(NA)
-    } else {
-      return(gfun.simple.pwlin(xyz=lst$w,par=par[which.angles],par.locs=par.locs[which.angles,]))
-    }
-  })
-}
+# # evaluating the gauge at a set of angles, returns a vector
+# pwlin.g.vals = function(w.adj.angles,par,par.locs){
+#   # w.adj.angles  -> output of which.adj.angles()
+#   # par           -> parameters at reference angles
+#   # par.locs      -> 3-column matrix of reference angles.
+#   
+#   sapply(w.adj.angles, function(lst){
+#     which.angles = lst$loc.idx
+#     if(any(is.na(lst$w)) | all(which.angles==0) | any(lst$w<0) | any(is.na(which.angles))){  # if angle is not in the positive orthant OR if angle lies on line
+#       return(NA)
+#     } else {
+#       return(gfun.simple.pwlin(xyz=lst$w,par=par[which.angles],par.locs=par.locs[which.angles,]))
+#     }
+#   })
+# }
 
-qhull.options <- function(options, output.options, supported_output.options, full=FALSE) {
-  if (full) {
-    if (!is.null(output.options)) {
-      stop("full and output.options should not be specified together")
-    }
-    output.options = TRUE
-    ## Enable message in 0.4.1
-    ## Turn to warning in 0.4.7
-    message("delaunayn: \"full\" option is deprecated; adding \"Fa\" and \"Fn\" to options.
-      Please update your code to use \"output.options=TRUE\" or set \"output.options\" to a
-      string containing desired QHull options.")
-  }
-  
-  if (is.null(output.options)) {
-    output.options <- ""
-  }
-  if (is.logical(output.options)) {
-    if (output.options) {
-      output.options <- paste(supported_output.options, collapse=" ")
-    } else {
-      output.options  <- ""
-    }
-  }
-  if (!is.character(output.options)) {
-    stop("output.options must be a string, logical or NULL")
-  }
-  
-  ## Input sanitisation
-  options <- paste(options, output.options, collapse=" ")
-  return(options)
-}
-
-delaunayn <-
-  function(p, options=NULL, output.options=NULL, full=FALSE) {
-    tmp_stdout <- tempfile("Rf")
-    tmp_stderr <- tempfile("Rf")
-    on.exit(unlink(c(tmp_stdout, tmp_stderr)))
-    
-    ## Coerce the input to be matrix
-    if (is.data.frame(p)) {
-      p <- as.matrix(p)
-    }
-    
-    ## Make sure we have real-valued input
-    storage.mode(p) <- "double"
-    
-    ## We need to check for NAs in the input, as these will crash the C
-    ## code.
-    if (any(is.na(p))) {
-      stop("The first argument should not contain any NAs")
-    }
-    
-    ## Default options
-    default.options <- "Qt Qc Qx"
-    if (ncol(p) < 4) {
-      default.options <- "Qt Qc Qz"
-    }
-    if (is.null(options)) {
-      options <- default.options
-    }
-    
-    ## Combine and check options
-    options <- tryCatch(qhull.options(options, output.options, supported_output.options  <- c("Fa", "Fn"), full=full), error=function(e) {stop(e)})
-    
-    ## It is essential that delaunayn is called with either the QJ or Qt
-    ## option. Otherwise it may return a non-triangulated structure, i.e
-    ## one with more than dim+1 points per structure, where dim is the
-    ## dimension in which the points p reside.
-    if (!grepl("Qt", options) & !grepl("QJ", options)) {
-      options <- paste(options, "Qt")
-    }
-    
-    out <- .Call("C_delaunayn", p, as.character(options), tmp_stdout, tmp_stderr, PACKAGE="geometry")
-    
-    ## Check for points missing from triangulation, but not in the case
-    ## of a degenerate trianguation (zero rows in output)
-    if (nrow(out$tri) > 0) {
-      missing.points <- length(setdiff(seq(1,nrow(p)), unique(as.vector(out$tri))))
-      if (missing.points > 0) {
-        warning(paste0(missing.points, " points missing from triangulation.
-It is possible that setting the 'options' argument of delaunayn may help.
-For example:
-options = \"", default.options, " Qbb\"
-options = \"", default.options, " QbB\"
-If these options do not work, try shifting the centre of the points
-to the origin by subtracting the mean coordinates from every point."))
-      }
-    }
-    
-    # Remove NULL elements
-    out[which(sapply(out, is.null))] <- NULL
-    if (is.null(out$areas) & is.null(out$neighbours)) {
-      attr(out$tri, "delaunayn") <- attr(out$tri, "delaunayn")
-      return(out$tri)
-    }
-    class(out) <- "delaunayn"
-    out$p <- p
-    return(out)
-  }
+# qhull.options <- function(options, output.options, supported_output.options, full=FALSE) {
+#   if (full) {
+#     if (!is.null(output.options)) {
+#       stop("full and output.options should not be specified together")
+#     }
+#     output.options = TRUE
+#     ## Enable message in 0.4.1
+#     ## Turn to warning in 0.4.7
+#     message("delaunayn: \"full\" option is deprecated; adding \"Fa\" and \"Fn\" to options.
+#       Please update your code to use \"output.options=TRUE\" or set \"output.options\" to a
+#       string containing desired QHull options.")
+#   }
+#   
+#   if (is.null(output.options)) {
+#     output.options <- ""
+#   }
+#   if (is.logical(output.options)) {
+#     if (output.options) {
+#       output.options <- paste(supported_output.options, collapse=" ")
+#     } else {
+#       output.options  <- ""
+#     }
+#   }
+#   if (!is.character(output.options)) {
+#     stop("output.options must be a string, logical or NULL")
+#   }
+#   
+#   ## Input sanitisation
+#   options <- paste(options, output.options, collapse=" ")
+#   return(options)
+# }
+# 
+# delaunayn <-
+#   function(p, options=NULL, output.options=NULL, full=FALSE) {
+#     tmp_stdout <- tempfile("Rf")
+#     tmp_stderr <- tempfile("Rf")
+#     on.exit(unlink(c(tmp_stdout, tmp_stderr)))
+#     
+#     ## Coerce the input to be matrix
+#     if (is.data.frame(p)) {
+#       p <- as.matrix(p)
+#     }
+#     
+#     ## Make sure we have real-valued input
+#     storage.mode(p) <- "double"
+#     
+#     ## We need to check for NAs in the input, as these will crash the C
+#     ## code.
+#     if (any(is.na(p))) {
+#       stop("The first argument should not contain any NAs")
+#     }
+#     
+#     ## Default options
+#     default.options <- "Qt Qc Qx"
+#     if (ncol(p) < 4) {
+#       default.options <- "Qt Qc Qz"
+#     }
+#     if (is.null(options)) {
+#       options <- default.options
+#     }
+#     
+#     ## Combine and check options
+#     options <- tryCatch(qhull.options(options, output.options, supported_output.options  <- c("Fa", "Fn"), full=full), error=function(e) {stop(e)})
+#     
+#     ## It is essential that delaunayn is called with either the QJ or Qt
+#     ## option. Otherwise it may return a non-triangulated structure, i.e
+#     ## one with more than dim+1 points per structure, where dim is the
+#     ## dimension in which the points p reside.
+#     if (!grepl("Qt", options) & !grepl("QJ", options)) {
+#       options <- paste(options, "Qt")
+#     }
+#     
+#     out <- .Call("C_delaunayn", p, as.character(options), tmp_stdout, tmp_stderr, PACKAGE="geometry")
+#     
+#     ## Check for points missing from triangulation, but not in the case
+#     ## of a degenerate trianguation (zero rows in output)
+#     if (nrow(out$tri) > 0) {
+#       missing.points <- length(setdiff(seq(1,nrow(p)), unique(as.vector(out$tri))))
+#       if (missing.points > 0) {
+#         warning(paste0(missing.points, " points missing from triangulation.
+# It is possible that setting the 'options' argument of delaunayn may help.
+# For example:
+# options = \"", default.options, " Qbb\"
+# options = \"", default.options, " QbB\"
+# If these options do not work, try shifting the centre of the points
+# to the origin by subtracting the mean coordinates from every point."))
+#       }
+#     }
+#     
+#     # Remove NULL elements
+#     out[which(sapply(out, is.null))] <- NULL
+#     if (is.null(out$areas) & is.null(out$neighbours)) {
+#       attr(out$tri, "delaunayn") <- attr(out$tri, "delaunayn")
+#       return(out$tri)
+#     }
+#     class(out) <- "delaunayn"
+#     out$p <- p
+#     return(out)
+#   }
 
 
 which.adj.angles = function(angles,locs){
   # For each angle, where does it live in the partition of the simplex?
-  
+
   require(geometry)
-  
+
   # angles are d-dimensional
-  
+
   if("data.frame" %in% class(locs)){
     locs=as.matrix(locs)
   }
@@ -676,9 +676,9 @@ which.adj.angles = function(angles,locs){
   if(is.null(dim(angles))){
     angles=t(as.matrix(angles))
   }
-  
+
   num.cols = dim(locs)[2]
-  
+
   del.tri = delaunayn(p=locs[,-num.cols], output.options=TRUE)
   tsearchn.output = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
                              t=del.tri$tri,
@@ -697,14 +697,14 @@ gfun.pwl = function(x, par, ref.angles){
   if(is.null(dim(x))){
     x = matrix(x,nrow=1)
   }
-  
+
   num.cols = dim(x)[2]
-  
+
   rad.inp = apply(x,1,sum)
   angle.inp = x / rad.inp
   is.valid = apply(angle.inp,1,function(vec) all(!is.na(vec)))
-  w.adj.angles = replicate(nrow(angle.inp), 
-                           list(w=rep(NA,num.cols),  
+  w.adj.angles = replicate(nrow(angle.inp),
+                           list(w=rep(NA,num.cols),
                                 loc.idx=rep(NA,num.cols),
                                 vertices=matrix(NA,num.cols,num.cols)), FALSE)
   inn = as.matrix(angle.inp[is.valid,],ncol=num.cols,byrow=T)
@@ -712,19 +712,19 @@ gfun.pwl = function(x, par, ref.angles){
     inn = t(inn)
   }
   w.adj.angles[is.valid] = which.adj.angles(angles=inn, locs=ref.angles)
-  
+
   gval = rad.inp*pwlin.g.vals(w.adj.angles=w.adj.angles,par=par,par.locs=ref.angles)
   return(gval)
 }
 
-proj.g.fn = function(gfun,w,which.w,nm,...){
-  # gfun -> gauge that takes in 4-dim vectors
-  # w -> 3-min input
-  # which.w -> which index to take min over
-  
-  w.inp = matrix(NA,nrow=nm,ncol=4)
-  w.inp[,-which.w] = matrix(as.numeric(w),ncol=3,nrow=nm,byrow=T)
-  w.inp[,which.w] = seq(0,1.3,length.out=nm)
-  
-  return(min(gfun(w.inp,...)))
-}
+# proj.g.fn = function(gfun,w,which.w,nm,...){
+#   # gfun -> gauge that takes in 4-dim vectors
+#   # w -> 3-min input
+#   # which.w -> which index to take min over
+#   
+#   w.inp = matrix(NA,nrow=nm,ncol=4)
+#   w.inp[,-which.w] = matrix(as.numeric(w),ncol=3,nrow=nm,byrow=T)
+#   w.inp[,which.w] = seq(0,1.3,length.out=nm)
+#   
+#   return(min(gfun(w.inp,...)))
+# }
