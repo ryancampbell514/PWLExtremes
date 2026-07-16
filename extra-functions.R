@@ -728,3 +728,48 @@ gfun.pwl = function(x, par, ref.angles){
 #   
 #   return(min(gfun(w.inp,...)))
 # }
+
+f.mcmc.g.2d<-function(niter,nburn,theta,alpha,thin,g){
+  # initialize
+  w<-rbeta(1,alpha,alpha)
+  x<-rexp(1)*c(w,1-w)/g(c(w,1-w),par=theta)
+  draws<-matrix(ncol=2,nrow=niter)
+  it<-1
+  while(it<=niter){
+    w<-rbeta(1,alpha,alpha)
+    xcan<-rexp(1)*c(w,1-w)/g(c(w,1-w),par=theta)
+    
+    accn<-g(xy=x,par=theta)*dbeta(x[1]/(x[1]+x[2]),alpha,alpha)*(xcan[1]+xcan[2])^2
+    accd<-g(xy=xcan,par=theta)*dbeta(xcan[1]/(xcan[1]+xcan[2]),alpha,alpha)*(x[1]+x[2])^2
+    
+    if(runif(1)<accn/accd){x<-xcan}
+    
+    draws[it,]<-x
+    it<-it+1
+  }
+  return(draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),])
+}
+
+#########################################################
+
+
+f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
+  # initialize
+  w<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
+  x<-rexp(1)*w/g(w)
+  draws<-matrix(ncol=3,nrow=niter)
+  it<-1
+  while(it<=niter){
+    w<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
+    xcan<-rexp(1)*w/g(w)
+    
+    accn<-g(x)*LaplacesDemon::ddirichlet(x/sum(x),alpha)*(sum(xcan))^3
+    accd<-g(xcan)*LaplacesDemon::ddirichlet(xcan/sum(xcan),alpha)*(sum(x))^3
+    
+    if(runif(1)<accn/accd){x<-xcan}
+    
+    draws[it,]<-x
+    it<-it+1
+  }
+  return(draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),])
+}
