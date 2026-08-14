@@ -7,6 +7,8 @@ library(geometricMVE)
 library(evd)
 library(mvtnorm)
 
+source(file.path("PATH TO PWLExtremes","extra-functions.R"))
+
 set.seed(4444)
 n = 5000  # generate n datapoints
 tau=0.95  # the quantile at which we estimate the radial threshold
@@ -48,7 +50,6 @@ par.locs = seq(0,1,length.out=11)
 par.locs = seq(0,1,length.out=11)
 model.fit.R.unbounded           = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixshape = T)
 model.fit.R.unbounded2          = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixshape = F)
-model.fit.R.unbounded.pensearch = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=NULL,method="BFGS",bound.fit=F,fixshape = T)
 model.fit.R.bounded             = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixshape = T)
 model.fit.R.bounded2            = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=T,fixshape = F)
 model.fit.RW.unbounded          = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",W.fit=T,joint.fit=T,fixshape = T)
@@ -61,7 +62,6 @@ model.fit.W                     = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh
 par(mfrow=c(3,3),pty="s")
 plotfittedgauge(model.fit.R.unbounded)
 plotfittedgauge(model.fit.R.unbounded2)
-plotfittedgauge(model.fit.R.unbounded.pensearch)
 plotfittedgauge(model.fit.R.bounded)
 plotfittedgauge(model.fit.R.bounded2)
 plotfittedgauge(model.fit.RW.unbounded)
@@ -70,9 +70,10 @@ plotfittedgauge(model.fit.RW.bounded)
 plotfittedgauge(model.fit.RW.bounded2)
 
 # plot the angular models
+wpts = seq(0,1,length.out=100)
 par(mfrow=c(1,3),pty="s")
 hist(wexc,main=NULL,freq=F,ylim=c(0,5))
-lines(wpts, gfun.2d(cbind(wpts,1-wpts),par=model.fit.W$fW.mle,ref.angles=par.locs)^(-2) / (2*G.vol.2d(gauge.pars=model.fit.W$fW.mle, par.locs = par.locs)))
+lines(wpts, gfun.2d(cbind(wpts,1-wpts),par=model.fit.W$mle.W,ref.angles=par.locs)^(-2) / (2*G.vol.2d(gauge.pars=model.fit.W$mle.W, par.locs = par.locs)))
 hist(wexc,main=NULL,freq=F,ylim=c(0,5))
 lines(wpts, gfun.2d(cbind(wpts,1-wpts),par=model.fit.RW.unbounded$mle,ref.angles=par.locs)^(-2) / (2*G.vol.2d(gauge.pars=model.fit.RW.unbounded$mle, par.locs = par.locs)))
 hist(wexc,main=NULL,freq=F,ylim=c(0,5))

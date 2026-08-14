@@ -15,7 +15,6 @@ r<-apply(ds.exp.4d,1,sum)
 w<-ds.exp.4d/r
 
 tau=0.70
-bww=0.075
 qr=fit.thresh(r=r,w=w,tau=tau,bww=NULL)  # from extra-functions.R, for adaptive bww
 r0w = qr$r0w
 excind<-r>r0w
@@ -28,7 +27,7 @@ par.locs = rbind(diag(4),
                  rep(1/4,4),
                  c(1/3,1/3,1/3,0),c(1/3,1/3,0,1/3),c(1/3,0,1/3,1/3),c(0,1/3,1/3,1/3),
                  c(0.5,0.5,0,0),c(0.5,0,0.5,0),c(0.5,0,0,0.5),c(0,0.5,0.5,0),c(0,0.5,0,0.5),c(0,0,0.5,0.5))
-tri.mat = geometry::delaunayn(p=par.locs[,-4], output.options=TRUE)$tri
+tri.mat = delaunayn(p=par.locs[,-4], output.options=TRUE)$tri
 new.mesh = t(apply(tri.mat,1,function(row.idx){
   return(apply(par.locs[row.idx,],2,mean))
 }))
@@ -40,7 +39,7 @@ par.locs = data.frame(rbind(par.locs,new.mesh))
 par.locs = as.matrix(par.locs[!duplicated(par.locs), ])
 
 # set the initial parameters of model fitting
-init = KDE.quant.eval(wpts=par.locs,r=r,w=w,tau=tau,ker="Gaussian")
+init = eval.thresh(fit.thresh.out=qr,w.eval=par.locs)
 init = init/max(par.locs[,1] * init, na.rm = TRUE)
 init = ifelse(init > 1 / apply(par.locs,1,max), 1/ apply(par.locs,1,max), init)
 
@@ -50,7 +49,7 @@ R.fit = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,init
 mle = R.fit$mle
 
 # fit the angular model
-W.fit = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,init.val=init/init[1],
+W.fit = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,init.val=init[-1]/init[1],
                   pen.const=20,method="BFGS",W.fit=TRUE)
 
 #############################################################################
@@ -58,7 +57,6 @@ W.fit = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,init
 # Plot the threshold projections
 nms = colnames(w)
 plotfittedthresh.3dproj(qr, which.proj = 1, xlab = nms[2], ylab = nms[3], zlab = nms[4])
-plotfittedthresh.3dproj(qr2, which.proj = 1, xlab = nms[2], ylab = nms[3], zlab = nms[4])
 plotfittedthresh.3dproj(qr, which.proj = 2, xlab = nms[1], ylab = nms[3], zlab = nms[4])
 plotfittedthresh.3dproj(qr, which.proj = 3, xlab = nms[1], ylab = nms[2], zlab = nms[4])
 plotfittedthresh.3dproj(qr, which.proj = 4, xlab = nms[1], ylab = nms[2], zlab = nms[3])
@@ -123,14 +121,14 @@ view3d(userMatrix = usermat)
 # PP, QQ, and return-level plots
 
 mle=R.fit$mle
-par.locs = R.fit.13.refit$par.locs
+par.locs = R.fit$par.locs
 gfun = function(w,par,locs=par.locs){
   gfun.pwl(x=w,par=par,ref.angles=locs)
 }
 
 par(mfrow=c(1,2),pty="s")
-geometricMVE::ppdiag.4d(r=rexc,w=wexc,r0w=r0w,par=c(4,mle),gfun=gfun)
-geometricMVE::qqdiag.4d(r=rexc,w=wexc,r0w=r0w,par=c(4,mle),gfun=gfun)
+geometricMVE::ppdiag(r=rexc,w=wexc,r0w=r0w,par=c(4,mle),gfun=gfun)
+geometricMVE::qqdiag(r=rexc,w=wexc,r0w=r0w,par=c(4,mle),gfun=gfun)
 
 # return level plots, evaluated on the dataset's angles
 gauge.est.vals.w = gfun.pwl(w,par=mle,ref.angles=par.locs)
@@ -142,18 +140,9 @@ est.prop.exc = sapply(T.vals,function(T.val){
 x.vals = log(T.vals)
 y.vals = log(1/est.prop.exc)
 
-load("d4pollution_chi_bs_pwl_tau070.Rdata")
-bs.estimates = do.call(rbind,lapply(bs.res.pwl, function(lst) lst$est.log.T.bs))
-pwl.CI.l = apply(bs.estimates,2,quantile,probs=0.025,na.rm=T)
-pwl.CI.u = apply(bs.estimates,2,quantile,probs=0.975,na.rm=T)
-
-pdf(paste0("figs/",dirnm,"/d4pollution_return.pdf"),width=5,height=5)
 par(mfrow=c(1,1),pty="s",mar=c(4.2,4.2,4.2,4.2),cex.lab=1.5)
 plot(x=x.vals,y=y.vals,pch=20,
      xlim=c(min(x.vals,y.vals),max(x.vals,y.vals)),
      ylim=c(min(x.vals,y.vals),max(x.vals,y.vals)),
      xlab="log(T), true",ylab="log(T), estimated",type="p")
 segments(-1,-1,10000,10000)
-lines(x.vals,pwl.CI.l,lty=2)
-lines(x.vals,pwl.CI.u,lty=2)
-dev.off()

@@ -426,138 +426,529 @@ checkfn = function(quant,inp){
 
 ###########################################################################
 
+
+###############################################################################
+################################  d=2  ########################################
+###############################################################################
+
+# Given angles and reference angles, return a list containing the angles and
+# the indices of reference angles
+which.adj.angles.2d = function(angles,locs,norm=NULL,marg="pos"){
+  # w         -> a vector or 2-column matrix of angles in the d=1 unit simplex
+  # locs      -> vector of length Nmesh, the reference angles in the d=1 unit simplex
+  
+  n.pars = length(locs)
+  
+  if(marg=="pos"){
+    lst.val = lapply(angles,function(w){
+      for(j in 1:(n.pars-1)){
+        if(w>=locs[j] & w<=locs[j+1]){
+          break
+        }
+      }
+      return(list(w=w,
+                  idx.locs=c(j,j+1)))
+    })
+  } else if(marg=="Rd"){
+    lst.val = lapply(angles,function(w){
+      for(j in 1:(n.pars)){
+        idx.low = j
+        idx.up = j+1
+        val.low = locs[j]
+        val.up = ifelse(idx.up>length(locs),-2,locs[j+1])
+        if(w>=val.low & w<=val.up){
+          break
+        }
+      }
+      idx.up =  ifelse(idx.up>length(locs),1,idx.up)
+      return(list(w=w,
+                  idx.locs=c(idx.low,idx.up)))
+    })
+  }
+  return(lst.val)
+}
+
+G.vol.2d = function(gauge.pars,par.locs,marg="pos"){
+  if(marg=="pos"){
+    val = 0.5*sum(sapply(c(1:(length(par.locs)-1)),
+                         function(j){
+                           par.locs.1.x = par.locs[j]
+                           par.locs.2.x = par.locs[j+1]
+                           par.locs.1.y = 1-par.locs[j]
+                           par.locs.2.y = 1-par.locs[j+1]
+                           return(gauge.pars[j]*gauge.pars[j+1]*
+                                    abs(par.locs.1.x*par.locs.2.y - par.locs.2.x*par.locs.1.y))
+                         }))
+    return(val)
+  } else if(marg=="Rd"){
+    val = 0.5*sum(sapply(c(1:(length(par.locs))),
+                         function(j){
+                           loc1 = par.locs[j]
+                           loc2 = ifelse(j+1>length(par.locs),-2,par.locs[j+1])
+                           
+                           g.pars.1 = gauge.pars[j]
+                           g.pars.2 = ifelse(j+1>length(par.locs),gauge.pars[1],gauge.pars[j+1])
+                           
+                           par.locs.1 = pol2cart.L1Rd(w=loc1)
+                           par.locs.2 = pol2cart.L1Rd(w=loc2)
+                           par.locs.1.x = par.locs.1[1,1]
+                           par.locs.2.x = par.locs.2[1,1]
+                           par.locs.1.y = par.locs.1[1,2]
+                           par.locs.2.y = par.locs.2[1,2]
+                           return(g.pars.1*g.pars.2*
+                                    abs(par.locs.1.x*par.locs.2.y - par.locs.2.x*par.locs.1.y))
+                         }))
+    return(val)
+  }
+}
+
+###############################################################################
+################################  d>2  ########################################
+###############################################################################
+
+which.adj.angles = function(angles,locs){
+  # For each angle, where does it live in the partition of the simplex?
+  
+  require(geometry)
+  
+  # angles are d-dimensional
+  
+  if("data.frame" %in% class(locs)){
+    locs=as.matrix(locs)
+  }
+  if("data.frame" %in% class(angles)){
+    angles=as.matrix(angles)
+  }
+  if(is.null(dim(angles))){
+    angles=t(as.matrix(angles))
+  }
+  
+  num.cols = dim(locs)[2]
+  
+  del.tri = geometry::delaunayn(p=locs[,-num.cols], output.options=TRUE)
+  tsearchn.output = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
+                             t=del.tri$tri,
+                             xi=matrix(angles[,-num.cols],ncol=num.cols-1))
+  locs.idx = tsearchn.output$idx
+  w.adj.angles = lapply(c(1:nrow(angles)),function(i){
+    return(list(w=angles[i,],                                # the angle of interest, w
+                tri.idx=locs.idx[i],                         # the index of the triangle where w belongs
+                loc.idx=del.tri$tri[locs.idx[i],],           # the indices of the enclosing vertices
+                vertices=locs[del.tri$tri[locs.idx[i],],]))  # the enclosing vertices (a matrix of size d x d)
+  })
+  return(w.adj.angles)
+}
+
+adj.DT = function(par.locs){
+  # given reference angles, return the indices of the neighboring
+  # triangles in the Delaunay triangulation
+  
+  num.cols = dim(par.locs)[2]
+  del.tri = geometry::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)
+  tri = del.tri$tri
+  num.tris = nrow(tri)
+  adj.lst = list(list(NULL))
+  for(k in 1:num.tris){
+    tri.k = tri[k,]
+    adj.idx = NULL
+    for(j in 1:num.tris){
+      if(sum(table(c(tri.k,tri[j,]))==2)==(num.cols-1)){
+        # if this is satisfied, tirangles i and j are neighbours
+        adj.idx = c(adj.idx,j)
+      }
+    }
+    adj.lst[[k]] = sort(adj.idx)
+  }
+  return(adj.lst)
+}
+
+ij.couples = function(par.locs){
+  # given N par locs (nodes), for each node, find the (i,j) pairings in the penalty
+  require(dplyr)
+  
+  num.cols = dim(par.locs)[2]
+  tri = geometry::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)$tri
+  adj.list = adj.DT(par.locs)
+  
+  ij.couples.lst = list(list(NULL))  # eventually will be of length N
+  for(l in 1:nrow(par.locs)){
+    #i=20
+    # which triangle has location "i" as a vertex?
+    which.has.l = apply(tri,1,function(ll){
+      l %in% ll
+    })
+    if(sum(which.has.l)==1){
+      # only 1 face, can't compare gradient to another
+      ij.couples.lst[[l]] = NA
+      next
+    } else if(sum(which.has.l)>1){
+      # which.grad.gs = (1:length(grad.g))[which.has.i]
+      idx.w.l = c(1:length(adj.list))[which.has.l]
+      adj.list.l = adj.list[idx.w.l]
+      names(adj.list.l) = idx.w.l
+      adj.list.l = lapply(adj.list.l, function(vec){
+        return(vec[vec %in% idx.w.l])
+      })
+      ij.couples = lapply(1:length(idx.w.l), function(idx){
+        idx.w.l.idx = idx.w.l[idx]
+        lapply(adj.list.l[[idx]], function(vec){
+          lapply(vec,function(vec.i){
+            return(sort(c(idx.w.l.idx,vec.i)))
+          })
+        })
+      })
+      ij.couples = matrix(unlist(ij.couples),ncol=2,byrow=T)
+      ij.couples = unname(as.matrix(distinct(as.data.frame(ij.couples,col.names=NULL))))
+      ij.couples.lst[[l]] = ij.couples
+    }
+  }
+  return(ij.couples.lst)
+}
+
+G.vol = function(gauge.pars,par.locs){
+  num.cols = dim(par.locs)[2]
+  
+  # Method 2: coordinate geometry
+  del.tri = geometry::delaunayn(p=par.locs[,-num.cols], output.options=TRUE)
+  nodes = del.tri$tri
+  vol = (1/factorial(num.cols))*sum(apply(nodes,1,function(loc){
+    pp = gauge.pars[loc]
+    ll = par.locs[loc,]
+    return(abs(det(ll*pp)))
+  }))
+  return(vol)
+}
+
+# Given angles and reference angles, return a list containing the reference angles,
+# their indices, and how many angles are in each region
+n.DT.region = function(which.adj.angles.res,locs){
+  # which.adj.angles.res  -> output of which.adj.angles()
+  # locs                  -> the reference angles in the d=2 unit simplex
+  
+  all.regions = lapply(which.adj.angles.res, function(lst) sort(lst$loc.idx))
+  idx.locs = unique(all.regions)
+  
+  res = lapply(idx.locs,function(loc){
+    freq = sum(sapply(which.adj.angles.res, function(lst) all(sort(lst$loc.idx) == loc)))
+    return(list(reg = locs[loc,],  # the region is defined by these vertices
+                loc = loc,
+                freq=freq))        # there are this many angles in the region
+  })
+  
+  return(res)
+}
+
+# # Given d-collumn exceedance angles, get reference angles such that each has
+# # sufficient data to estmate
+# get.par.logs = function(data){
+#
+#   res
+#
+#   return(res)
+# }
+
+###################################################################
+
+# other functions
+
+# sampling from f=e^-g
+
+f.mcmc.g.2d<-function(niter,nburn,theta,alpha,thin,g){
+  # initialize
+  w<-rbeta(1,alpha,alpha)
+  x<-rexp(1)*c(w,1-w)/g(c(w,1-w),par=theta)
+  draws<-matrix(ncol=2,nrow=niter)
+  it<-1
+  while(it<=niter){
+    w<-rbeta(1,alpha,alpha)
+    xcan<-rexp(1)*c(w,1-w)/g(c(w,1-w),par=theta)
+    
+    accn<-g(xy=x,par=theta)*dbeta(x[1]/(x[1]+x[2]),alpha,alpha)*(xcan[1]+xcan[2])^2
+    accd<-g(xy=xcan,par=theta)*dbeta(xcan[1]/(xcan[1]+xcan[2]),alpha,alpha)*(x[1]+x[2])^2
+    
+    if(runif(1)<accn/accd){x<-xcan}
+    
+    draws[it,]<-x
+    it<-it+1
+  }
+  return(draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),])
+}
+
+#########################################################
+
+
+f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
+  # initialize
+  w<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
+  x<-rexp(1)*w/g(w)
+  draws<-matrix(ncol=3,nrow=niter)
+  it<-1
+  while(it<=niter){
+    w<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
+    xcan<-rexp(1)*w/g(w)
+    
+    accn<-g(x)*LaplacesDemon::ddirichlet(x/sum(x),alpha)*(sum(xcan))^3
+    accd<-g(xcan)*LaplacesDemon::ddirichlet(xcan/sum(xcan),alpha)*(sum(x))^3
+    
+    if(runif(1)<accn/accd){x<-xcan}
+    
+    draws[it,]<-x
+    it<-it+1
+  }
+  return(draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),])
+}
+
+###########################################################
+
+get_ref_angles = function(w, min.num = 30, gauss.corr=F){
+  
+  dd = dim(w)[2]
+  
+  # define par.locs
+  # load("parlocs.RData")
+  par.locs = expand.grid(replicate(dd-1, seq(0,1,by=0.2), simplify = FALSE))
+  par.locs = cbind(par.locs,1-apply(par.locs,1,sum))
+  par.locs[,dd] = round(par.locs[,dd],3)
+  par.locs = par.locs[par.locs[,dd]>=0,]
+  par.locs = data.frame(rbind(diag(dd),as.matrix(unname(par.locs))))
+  par.locs = as.matrix(unname(par.locs[!duplicated(par.locs),]))
+  
+  numm = rep(0,nrow(par.locs))
+  while(any(numm < min.num)){
+    
+    nlocs = dim(par.locs)[1]
+    which.adj.angles.res = which.adj.angles(w,par.locs)
+    numm = sapply(1:nlocs, function(loc.fix){
+      num = sum(sapply(which.adj.angles.res,function(lst){
+        locs = lst$loc.idx
+        return(loc.fix %in% locs)
+      }))
+      return(num)
+    })
+    # print(cbind(par.locs,numm))
+    # print(numm)
+    # which.rm = numm < min.num & c(1:nrow(par.locs)) > dd
+    unique.min = min(unique(numm))
+    which.rm = (numm < min.num) & (c(1:nrow(par.locs)) > dd) & (numm == unique.min)
+    
+    par.locs.new = par.locs[!which.rm,]
+    if(nrow(par.locs.new) == nrow(par.locs)){
+      ord = order(numm)
+      which.rm = ord[ord>dd][1]
+      par.locs = par.locs.new[-which.rm,]
+    } else {
+      par.locs = par.locs.new
+    }
+    
+  }
+  
+  if(gauss.corr){
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
+    par.locs = ifelse(par.locs<0,0,par.locs)
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
+  }
+  
+  return(par.locs)
+}
+
+get_ref_angles_5d = function(w,min.num=30,gauss.corr=F){
+  
+  # testing version - ignore for now.
+  
+  dd = dim(w)[2]
+  
+  # define par.locs
+  # load("parlocs.RData")
+  par.locs = expand.grid(replicate(dd-1, seq(0,1,by=0.1), simplify = FALSE))
+  par.locs = cbind(par.locs,1-apply(par.locs,1,sum))
+  par.locs[,dd] = round(par.locs[,dd],3)
+  par.locs = par.locs[par.locs[,dd]>=0,]
+  par.locs = data.frame(rbind(diag(dd),as.matrix(unname(par.locs))))
+  par.locs = as.matrix(unname(par.locs[!duplicated(par.locs),]))
+  
+  # par.locs2 = rbind(diag(5),
+  #                  rep(1/5,5),
+  #                  c(1/4,1/4,1/4,1/4,0),c(1/4,1/4,1/4,0,1/4),c(1/4,1/4,0,1/4,1/4),c(1/4,0,1/4,1/4,1/4),c(0,1/4,1/4,1/4,1/4),
+  #                  c(1/3,1/3,1/3,0,0),c(1/3,1/3,0,1/3,0),c(1/3,0,1/3,1/3,0),c(0,1/3,1/3,1/3,0),
+  #                  c(1/3,1/3,0,0,1/3),c(1/3,0,1/3,0,1/3),c(0,1/3,1/3,0,1/3),
+  #                  c(1/3,0,0,1/3,1/3), c(0,1/3,0,1/3,1/3), c(0,0,1/3,1/3,1/3),
+  #                  c(0.5,0.5,0,0,0),c(0.5,0,0.5,0,0),c(0.5,0,0,0.5,0),c(0.5,0,0,0,0.5),
+  #                  c(0,0.5,0.5,0,0),c(0,0.5,0,0.5,0),c(0,0.5,0,0,0.5),
+  #                  c(0,0,0.5,0.5,0),c(0,0,0.5,0,0.5),c(0,0,0,0.5,0.5)
+  # )
+  # par.locs = rbind(diag(dd),par.locs)
+  # par.locs = as.matrix(unname(par.locs[!duplicated(data.frame(par.locs)),]))
+  
+  numm = rep(0,nrow(par.locs))
+  while(any(numm < min.num)){
+    
+    nlocs = dim(par.locs)[1]
+    which.adj.angles.res = which.adj.angles(w,par.locs)
+    numm = sapply(1:nlocs, function(loc.fix){
+      num = sum(sapply(which.adj.angles.res,function(lst){
+        locs = lst$loc.idx
+        return(loc.fix %in% locs)
+      }))
+      return(num)
+    })
+    # print(cbind(par.locs,numm))
+    # print(numm)
+    unique.min = min(unique(numm))
+    which.rm = (numm < min.num) & (c(1:nrow(par.locs)) > dd) & (numm == unique.min)
+    par.locs.new = par.locs[!which.rm,]
+    if(nrow(par.locs.new) == nrow(par.locs)){
+      ord = order(numm)
+      which.rm = ord[ord>dd][1]
+      par.locs = par.locs.new[-which.rm,]
+    } else {
+      par.locs = par.locs.new
+    }
+    
+  }
+  
+  if(gauss.corr){
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] + rnorm(n=prod(dim(par.locs[-c(1:dd),])),sd=0.001)
+    par.locs = ifelse(par.locs<0,0,par.locs)
+    par.locs[-c(1:dd),] = par.locs[-c(1:dd),] / apply(par.locs[-c(1:dd),],1,sum)
+  }
+  
+  return(par.locs)
+}
+
+
+
 # d=2 pwl gauge function def
 
-# # Given angles and reference angles, return a list containing the angles and
-# # the indices of reference angles
-# which.adj.angles.2d = function(angles,locs,norm=NULL,marg="pos"){
-#   # w         -> a vector or 2-column matrix of angles in the d=1 unit simplex
-#   # locs      -> vector of length Nmesh, the reference angles in the d=1 unit simplex
-#   
-#   n.pars = length(locs)
-#   
-#   if(marg=="pos"){
-#     lst.val = lapply(angles,function(w){
-#       for(j in 1:(n.pars-1)){
-#         if(w>=locs[j] & w<=locs[j+1]){
-#           break
-#         }
-#       }
-#       return(list(w=w,
-#                   idx.locs=c(j,j+1)))
-#     })
-#   } else if(marg=="Rd"){
-#     lst.val = lapply(angles,function(w){
-#       for(j in 1:(n.pars)){
-#         idx.low = j
-#         idx.up = j+1
-#         val.low = locs[j]
-#         val.up = ifelse(idx.up>length(locs),-2,locs[j+1])
-#         if(w>=val.low & w<=val.up){
-#           break
-#         }
-#       }
-#       idx.up =  ifelse(idx.up>length(locs),1,idx.up)
-#       return(list(w=w,
-#                   idx.locs=c(idx.low,idx.up)))
-#     })
-#   }
-#   return(lst.val)
-# }
+# Given angles and reference angles, return a list containing the angles and
+# the indices of reference angles
+which.adj.angles.2d = function(angles,locs,norm=NULL,marg="pos"){
+  # w         -> a vector or 2-column matrix of angles in the d=1 unit simplex
+  # locs      -> vector of length Nmesh, the reference angles in the d=1 unit simplex
+
+  n.pars = length(locs)
+
+  if(marg=="pos"){
+    lst.val = lapply(angles,function(w){
+      for(j in 1:(n.pars-1)){
+        if(w>=locs[j] & w<=locs[j+1]){
+          break
+        }
+      }
+      return(list(w=w,
+                  idx.locs=c(j,j+1)))
+    })
+  } else if(marg=="Rd"){
+    lst.val = lapply(angles,function(w){
+      for(j in 1:(n.pars)){
+        idx.low = j
+        idx.up = j+1
+        val.low = locs[j]
+        val.up = ifelse(idx.up>length(locs),-2,locs[j+1])
+        if(w>=val.low & w<=val.up){
+          break
+        }
+      }
+      idx.up =  ifelse(idx.up>length(locs),1,idx.up)
+      return(list(w=w,
+                  idx.locs=c(idx.low,idx.up)))
+    })
+  }
+  return(lst.val)
+}
 
 
-# # given 3 parameters (par) located at 3 reference angles (par.locs),
-# # return the gauge function value at the point xyz
-# gfun.simple.d2pwlin.L1 = function(w,par,par.locs){
-#   # xyz      = 
-#   # par      = vector of length 2
-#   # par.locs = vector of length 2
-#   
-#   r1 = par[1]
-#   r2 = par[2]
-#   
-#   w.sort = sort(par.locs)
-#   w.low = w.sort[1]
-#   w.up = w.sort[2]
-#   
-#   dx = r2*w.up - r1*w.low
-#   dy = r2*(1-w.up) - r1*(1-w.low)
-#   a = dy/dx
-#   b = r1*(1-w.low - a*w.low)
-#   if(dx==0){
-#     return(w/(r1*w.low))
-#   } 
-#   else{
-#     return((1-w-(a*w))/b)
-#   }
-# }
+# given 3 parameters (par) located at 3 reference angles (par.locs),
+# return the gauge function value at the point xyz
+gfun.simple.d2pwlin.L1 = function(w,par,par.locs){
+  # xyz      =
+  # par      = vector of length 2
+  # par.locs = vector of length 2
+
+  r1 = par[1]
+  r2 = par[2]
+
+  w.sort = sort(par.locs)
+  w.low = w.sort[1]
+  w.up = w.sort[2]
+
+  dx = r2*w.up - r1*w.low
+  dy = r2*(1-w.up) - r1*(1-w.low)
+  a = dy/dx
+  b = r1*(1-w.low - a*w.low)
+  if(dx==0){
+    return(w/(r1*w.low))
+  }
+  else{
+    return((1-w-(a*w))/b)
+  }
+}
 
 
-# pwlin.g.vals.2d = function(w.adj.angles,par,par.locs){
-#   # w.adj.angles  -> output of which.adj.angles()
-#   # par           -> parameters at reference angles
-#   # par.locs      -> 3-column matrix of reference angles.
-#   
-#   sapply(w.adj.angles, function(lst){
-#     which.angles = lst$idx.locs
-#     return(gfun.simple.d2pwlin.L1(w=lst$w,par=par[which.angles],par.locs=par.locs[which.angles]))
-#   })
-# }
+pwlin.g.vals.2d = function(w.adj.angles,par,par.locs){
+  # w.adj.angles  -> output of which.adj.angles()
+  # par           -> parameters at reference angles
+  # par.locs      -> 3-column matrix of reference angles.
 
-# gfun.2d = function(x, par, ref.angles){
-#   # x-> matrix of 2 columns
-#   if(is.null(dim(x)) & length(x)==1){
-#     x = cbind(x,1-x)
-#   }
-#   if(is.null(dim(x)) & length(x)>1){
-#     x = matrix(x,nrow=1)
-#   }
-#   
-#   rad.inp = apply(x,1,sum)
-#   angle.inp = x[,1] / rad.inp
-#   
-#   w.adj.angles = which.adj.angles.2d(angles=angle.inp, locs=ref.angles)
-#   
-#   gval = rad.inp*pwlin.g.vals.2d(w.adj.angles=w.adj.angles,par=par,par.locs=ref.angles)
-#   
-#   return(gval)
-# }
+  sapply(w.adj.angles, function(lst){
+    which.angles = lst$idx.locs
+    return(gfun.simple.d2pwlin.L1(w=lst$w,par=par[which.angles],par.locs=par.locs[which.angles]))
+  })
+}
+
+gfun.2d = function(x, par, ref.angles){
+  # x-> matrix of 2 columns
+  if(is.null(dim(x)) & length(x)==1){
+    x = cbind(x,1-x)
+  }
+  if(is.null(dim(x)) & length(x)>1){
+    x = matrix(x,nrow=1)
+  }
+
+  rad.inp = apply(x,1,sum)
+  angle.inp = x[,1] / rad.inp
+
+  w.adj.angles = which.adj.angles.2d(angles=angle.inp, locs=ref.angles)
+
+  gval = rad.inp*pwlin.g.vals.2d(w.adj.angles=w.adj.angles,par=par,par.locs=ref.angles)
+
+  return(gval)
+}
 
 ######################################################################
 
 
 # plot the 3-d projection of the gauge function
 
-# gfun.simple.pwlin = function(xyz,par,par.locs){
-#   # par      = in R^3_+
-#   # par.locs = angles (in the simplex) where the parameters are location
-#   
-#   num.cols = dim(par.locs)[2]
-#   
-#   coplanar.mat = do.call(rbind,lapply(c(1:num.cols)[-1],function(i){
-#     (par[1]*par.locs[1,])-(par[i]*par.locs[i,])
-#   }))
-#   norm.vec = suppressWarnings({
-#     c(1,-1)*sapply(c(1:num.cols),function(i){det(coplanar.mat[,-i])})
-#   })
-#   sum(norm.vec * xyz) / sum(norm.vec * par[1] * par.locs[1,])
-# }
+gfun.simple.pwlin = function(xyz,par,par.locs){
+  # par      = in R^3_+
+  # par.locs = angles (in the simplex) where the parameters are location
 
-# # evaluating the gauge at a set of angles, returns a vector
-# pwlin.g.vals = function(w.adj.angles,par,par.locs){
-#   # w.adj.angles  -> output of which.adj.angles()
-#   # par           -> parameters at reference angles
-#   # par.locs      -> 3-column matrix of reference angles.
-#   
-#   sapply(w.adj.angles, function(lst){
-#     which.angles = lst$loc.idx
-#     if(any(is.na(lst$w)) | all(which.angles==0) | any(lst$w<0) | any(is.na(which.angles))){  # if angle is not in the positive orthant OR if angle lies on line
-#       return(NA)
-#     } else {
-#       return(gfun.simple.pwlin(xyz=lst$w,par=par[which.angles],par.locs=par.locs[which.angles,]))
-#     }
-#   })
-# }
+  num.cols = dim(par.locs)[2]
+
+  coplanar.mat = do.call(rbind,lapply(c(1:num.cols)[-1],function(i){
+    (par[1]*par.locs[1,])-(par[i]*par.locs[i,])
+  }))
+  norm.vec = suppressWarnings({
+    c(1,-1)*sapply(c(1:num.cols),function(i){det(coplanar.mat[,-i])})
+  })
+  sum(norm.vec * xyz) / sum(norm.vec * par[1] * par.locs[1,])
+}
+
+# evaluating the gauge at a set of angles, returns a vector
+pwlin.g.vals = function(w.adj.angles,par,par.locs){
+  # w.adj.angles  -> output of which.adj.angles()
+  # par           -> parameters at reference angles
+  # par.locs      -> 3-column matrix of reference angles.
+
+  sapply(w.adj.angles, function(lst){
+    which.angles = lst$loc.idx
+    if(any(is.na(lst$w)) | all(which.angles==0) | any(lst$w<0) | any(is.na(which.angles))){  # if angle is not in the positive orthant OR if angle lies on line
+      return(NA)
+    } else {
+      return(gfun.simple.pwlin(xyz=lst$w,par=par[which.angles],par.locs=par.locs[which.angles,]))
+    }
+  })
+}
 
 # qhull.options <- function(options, output.options, supported_output.options, full=FALSE) {
 #   if (full) {
@@ -659,39 +1050,39 @@ checkfn = function(quant,inp){
 #     return(out)
 #   }
 
-
-which.adj.angles = function(angles,locs){
-  # For each angle, where does it live in the partition of the simplex?
-
-  require(geometry)
-
-  # angles are d-dimensional
-
-  if("data.frame" %in% class(locs)){
-    locs=as.matrix(locs)
-  }
-  if("data.frame" %in% class(angles)){
-    angles=as.matrix(angles)
-  }
-  if(is.null(dim(angles))){
-    angles=t(as.matrix(angles))
-  }
-
-  num.cols = dim(locs)[2]
-
-  del.tri = delaunayn(p=locs[,-num.cols], output.options=TRUE)
-  tsearchn.output = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
-                             t=del.tri$tri,
-                             xi=matrix(angles[,-num.cols],ncol=num.cols-1))
-  locs.idx = tsearchn.output$idx
-  w.adj.angles = lapply(c(1:nrow(angles)),function(i){
-    return(list(w=angles[i,],                                # the angle of interest, w
-                tri.idx=locs.idx[i],                         # the index of the triangle where w belongs
-                loc.idx=del.tri$tri[locs.idx[i],],           # the indices of the enclosing vertices
-                vertices=locs[del.tri$tri[locs.idx[i],],]))  # the enclosing vertices (a matrix of size d x d)
-  })
-  return(w.adj.angles)
-}
+# 
+# which.adj.angles = function(angles,locs){
+#   # For each angle, where does it live in the partition of the simplex?
+# 
+#   require(geometry)
+# 
+#   # angles are d-dimensional
+# 
+#   if("data.frame" %in% class(locs)){
+#     locs=as.matrix(locs)
+#   }
+#   if("data.frame" %in% class(angles)){
+#     angles=as.matrix(angles)
+#   }
+#   if(is.null(dim(angles))){
+#     angles=t(as.matrix(angles))
+#   }
+# 
+#   num.cols = dim(locs)[2]
+# 
+#   del.tri = delaunayn(p=locs[,-num.cols], output.options=TRUE)
+#   tsearchn.output = tsearchn(x=locs[,-num.cols],#rbind(locs,0)[,-num.cols],
+#                              t=del.tri$tri,
+#                              xi=matrix(angles[,-num.cols],ncol=num.cols-1))
+#   locs.idx = tsearchn.output$idx
+#   w.adj.angles = lapply(c(1:nrow(angles)),function(i){
+#     return(list(w=angles[i,],                                # the angle of interest, w
+#                 tri.idx=locs.idx[i],                         # the index of the triangle where w belongs
+#                 loc.idx=del.tri$tri[locs.idx[i],],           # the indices of the enclosing vertices
+#                 vertices=locs[del.tri$tri[locs.idx[i],],]))  # the enclosing vertices (a matrix of size d x d)
+#   })
+#   return(w.adj.angles)
+# }
 gfun.pwl = function(x, par, ref.angles){
   # x-> matrix of d columns
   if(is.null(dim(x))){
@@ -717,17 +1108,17 @@ gfun.pwl = function(x, par, ref.angles){
   return(gval)
 }
 
-# proj.g.fn = function(gfun,w,which.w,nm,...){
-#   # gfun -> gauge that takes in 4-dim vectors
-#   # w -> 3-min input
-#   # which.w -> which index to take min over
-#   
-#   w.inp = matrix(NA,nrow=nm,ncol=4)
-#   w.inp[,-which.w] = matrix(as.numeric(w),ncol=3,nrow=nm,byrow=T)
-#   w.inp[,which.w] = seq(0,1.3,length.out=nm)
-#   
-#   return(min(gfun(w.inp,...)))
-# }
+proj.g.fn = function(gfun,w,which.w,nm,...){
+  # gfun -> gauge that takes in 4-dim vectors
+  # w -> 3-min input
+  # which.w -> which index to take min over
+
+  w.inp = matrix(NA,nrow=nm,ncol=4)
+  w.inp[,-which.w] = matrix(as.numeric(w),ncol=3,nrow=nm,byrow=T)
+  w.inp[,which.w] = seq(0,1.3,length.out=nm)
+
+  return(min(gfun(w.inp,...)))
+}
 
 f.mcmc.g.2d<-function(niter,nburn,theta,alpha,thin,g){
   # initialize
@@ -773,3 +1164,296 @@ f.mcmc.g.3d<-function(niter,nburn,alpha=rep(1,3),thin,g){
   }
   return(draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),])
 }
+
+############################################################################
+
+# Extra, manuscript-specific sampling functions
+
+# 2-dimensional code
+
+# importance weights:
+iweights.2d.pwl = function (k, r0w, w, gfun, shape, par){
+  if (k < 1) {
+    warning("k is below 1, adjusted to k = 1.")
+    k = 1
+  }
+  rate <- sapply(w, gfun, par = par)
+  return(pgamma(k * r0w, shape = shape, rate = rate, lower.tail = F)/
+           pgamma(r0w, shape = shape, rate = rate, lower.tail = F))
+}
+
+# simulate from the empirical angular distirbution:
+sim.2d.cond = function (w, r0w, k = 1, nsim, shape=2, par, gfun, marg="pos") {
+  if (k != 1) {
+    iw <- iweights.2d.pwl(k = k, r0w = r0w, w = w, gfun = gfun, shape = shape, par = par)
+    star.ind <- sample(1:length(w), size = nsim, replace = T, prob = iw)
+    wstar <- w[star.ind]
+    r0w_star <- c(k * r0w)[star.ind]
+  }
+  else {
+    star.ind <- sample(1:length(w), size = nsim, replace = T)
+    wstar <- w[star.ind]
+    r0w_star <- r0w[star.ind]
+  }
+  rate0 <- sapply(w, gfun, par = par)
+  rate <- rate0[star.ind]
+  rstar <- qgamma(1 - runif(nsim) * pgamma(r0w_star, shape = shape, 
+                                           rate = rate, lower.tail = F), 
+                  shape = shape, rate = rate)
+  
+  if(marg=="pos"){
+    xstar <- cbind(rstar * wstar, rstar * (1 - wstar))
+  } else if(marg=="Rd"){
+    xstar <- pol2cart.L1Rd(r=rstar,w=wstar)
+  }
+  return(xstar)
+}
+
+# simulate from the proposed angular density
+fW.mcmc.g.2d<-function(niter,nburn,bpar1=1,bpar2=1,thin,g,return.acc.rate=FALSE,...){
+  ## bpar1,bpar2 -> beta parameters from proposal distribution, (default is uniform)
+  ## ... -> arguments to pass onto the gauge function
+  
+  # w<-runif(1)
+  w = rbeta(1,bpar1,bpar2)
+  draws<-numeric(niter)
+  it<-1
+  acc=0
+  while(it<=niter){
+    wcan<-rbeta(1,bpar1,bpar2)
+    accn<-dbeta(w,bpar1,bpar2)*(g(wcan,...)^(-2))
+    accd<-dbeta(wcan,bpar1,bpar2)*(g(w,...)^(-2))
+    if(runif(1)<accn/accd){w<-wcan; acc = acc+1}
+    draws[it]<-w
+    it<-it+1
+  }
+  print(paste("W MCMC acc. rate:",round(acc/niter,4)))
+  if(return.acc.rate){
+    return(list(acc.rate=round(acc/niter,4),
+                sample=draws[-(1:nburn)][seq(1,(niter-nburn),by=thin)]))
+  } else {
+    return(draws[-(1:nburn)][seq(1,(niter-nburn),by=thin)])
+  }
+}
+
+sim.2d.joint = function(nsim,k.vals=1,gfun,shape=2,par,fW.par,par.locs,r,w,
+                        tau=0.95,bww=0.05,bwr=0.05,marg="pos"){
+  ## k.vals  -> a single, or a vector of k values
+  ## par     -> parameters of R|W
+  ## fW.par  -> parameters of W
+  
+  # fit the proposal Beta distribution
+  if(marg=="Rd"){
+    w.beta = (w+2)/4
+    beta.nll = function(pars){-sum(dbeta(x=w.beta,shape1=pars[1],shape2=pars[2],log=T))}
+  } else {
+    beta.nll = function(pars){-sum(dbeta(x=w,shape1=pars[1],shape2=pars[2],log=T))}
+  }
+  beta.mle = optim(par=rep(1,2),fn=beta.nll)$par
+  
+  nthin=2
+  wstar = fW.mcmc.g.2d(niter=(nthin*nsim)+1000,nburn=1000,
+                       bpar1=beta.mle[1],bpar2=beta.mle[2],thin=nthin,
+                       g=gfun,par=fW.par,locs=par.locs)
+  
+  if(marg=="Rd"){
+    wstar = wstar*4 -2
+  }
+  
+  # now, evaluate r0w at the sampled angles
+  r.tau.wstar = sapply(wstar,function(wstar.i){
+    weightsw<-dnorm(w,mean=as.numeric(wstar.i),sd=bww)
+    ccdf<-function(rc){
+      mean(weightsw*pnorm(rc,mean=r,sd=bwr))/mean(weightsw)
+    }
+    dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
+    ur<-uniroot(dummy,interval = c(0,30))
+    return(ur$root)
+  })
+  
+  sims = lapply(k.vals, function(k){
+    if(k==1){
+      rate <- sapply(wstar, gfun, par = par)
+      rstar <- qgamma(1 - runif(nsim) * pgamma(k*r.tau.wstar, shape = shape, 
+                                               rate = rate, lower.tail = F), 
+                      shape = shape, rate = rate)
+      # return(rstar*cbind(wstar,1-wstar))
+      if(marg=="pos"){
+        xstar <- cbind(rstar * wstar, rstar * (1 - wstar))
+      } else if(marg=="Rd"){
+        xstar <- pol2cart.L1Rd(r=rstar,w=wstar)
+      }
+      return(xstar)
+    } else if (k>1){
+      iw <- iweights.2d.pwl(k=k,r0w=r.tau.wstar,w=wstar,gfun=gfun,shape=shape,par=par)
+      star.ind <- sample(1:length(wstar),size=nsim,replace=T,prob=iw)
+      wstar2 <- wstar[star.ind]
+      r.tau.wstar2 <- c(k*r.tau.wstar)[star.ind]
+      
+      rate <- sapply(wstar2, gfun, par = par)
+      rstar <- qgamma(1 - runif(nsim) * pgamma(r.tau.wstar2, shape = shape, 
+                                               rate = rate, lower.tail = F), 
+                      shape = shape, rate = rate)
+      # return(rstar*cbind(wstar2,1-wstar2))
+      if(marg=="pos"){
+        xstar <- cbind(rstar * wstar2, rstar * (1 - wstar2))
+      } else if(marg=="Rd"){
+        xstar <- pol2cart.L1Rd(r=rstar,w=wstar2)
+      }
+      return(xstar)
+    }
+  })
+  return(sims)
+}
+
+
+##############################################################################
+##############################################################################
+# general d-dimensions
+
+iweights.pwl = function (k, r0w, w, gfun, shape, par){
+  # WARNING: assumed fixed shape parameter of d
+  
+  if (k < 1) {
+    warning("k is below 1, adjusted to k = 1.")
+    k = 1
+  }
+  rate=apply(w, 1, gfun, par = par)
+  return(pgamma(k * r0w, shape = shape, rate = rate, lower.tail = F)/
+           pgamma(r0w, shape = shape, rate = rate, lower.tail = F))
+}
+
+sim.cond = function (w, r0w, k = 1, nsim, shape=NULL, par, gfun) {
+  
+  if(is.null(shape)){
+    shape=dim(w)[2]
+  }
+  
+  # WARNING: assumed fixed shape parameter
+  if (k != 1) {
+    iw <- iweights.pwl(k = k, r0w = r0w, w = w, gfun = gfun, par = par, shape=shape)
+    star.ind <- sample(1:nrow(w), size = nsim, replace = T, prob = iw)
+    wstar <- w[star.ind,]
+    r0w_star <- c(k * r0w)[star.ind]
+  }
+  else {
+    star.ind <- sample(1:nrow(w), size = nsim, replace = T)
+    wstar <- w[star.ind,]
+    r0w_star <- r0w[star.ind]
+  }
+  # rate0 <- pwlin.g.vals.3d(which.adj.angles.3d(angles=w,locs=locs),par,locs)
+  rate0=apply(w, 1, gfun, par = par)
+  rate <- rate0[star.ind]
+  rstar <- qgamma(1 - runif(nsim) * pgamma(r0w_star, shape = shape, 
+                                           rate = rate, lower.tail = F), 
+                  shape = shape, rate = rate)
+  xstar = rstar * wstar
+  return(xstar)
+}
+
+# sample using angle information
+fW.mcmc.g<-function(W.dim,niter,nburn,alpha,thin,g,return.acc.rate=FALSE,...){
+  ## alpha -> vector, parameters of the Dirichlet distribution (default -> uniform on simplex)
+  ## ...   -> arguments to pass onto the gauge function
+  
+  if(is.null(alpha)){
+    alpha=rep(1,W.dim)
+  }
+  
+  # initialize
+  w<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
+  draws<-matrix(ncol=W.dim,nrow=niter)
+  it<-1
+  acc=0
+  while(it<=niter){
+    wcan<-as.numeric(LaplacesDemon::rdirichlet(1,alpha))
+    
+    accn<-LaplacesDemon::ddirichlet(w,alpha)*(g(wcan,...)^(-W.dim))
+    accd<-LaplacesDemon::ddirichlet(wcan,alpha)*(g(w,...)^(-W.dim))
+    
+    if(runif(1)<accn/accd){w<-wcan; acc=acc+1}
+    
+    draws[it,]<-w
+    it<-it+1
+  }
+  print(paste("W MCMC acc. rate:",round(acc/niter,4)))
+  if(return.acc.rate){
+    return(list(acc.rate=round(acc/niter,4),
+                sample=draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),]))
+  } else {
+    return(draws[-(1:nburn),][seq(1,(niter-nburn),by=thin),])
+  }
+}
+
+sim.joint = function(nsim,k.vals=1,shape=NULL,par,fW.par,par.locs,par.locs.W=NULL,
+                     r,w,tau=0.95,bww=0.05,bwr=0.05){
+  
+  if(is.null(par.locs.W)){
+    par.locs.W=par.locs
+  }
+  
+  # get proposal alphas
+  is.error <- FALSE
+  tryCatch({
+    dirichlet.nll = function(pars){-sum(LaplacesDemon::ddirichlet(x=w,alpha=pars,log=T))}
+  },error=function(e){
+    is.error <<- TRUE 
+  })
+  
+  W.dim=dim(w)[2]
+  if(is.null(shape)){
+    shape=W.dim
+  }
+  
+  if(is.error) {
+    alpha=rep(1,W.dim)  # uniform over the simplex
+  } else {
+    alpha = optim(par=rep(1,W.dim),fn=dirichlet.nll)$par
+  }
+  # dirichlet.nll = function(pars){-sum(LaplacesDemon::ddirichlet(x=w,alpha=pars,log=T))}
+  # alpha = optim(par=rep(1,3),fn=dirichlet.nll)$par
+  # alpha=c(1,1,1)  # uniform over the simplex
+  
+  # simulate exceedance angles
+  nthin=4
+  wstar = fW.mcmc.g(W.dim=W.dim,niter=(nthin*nsim)+1000,nburn=1000,thin=nthin,
+                    alpha=alpha,
+                    g=function(w,par=fW.par,locs=par.locs.W){gfun.pwl(x=w,par=par,ref.angles=locs)},
+                    par=fW.par,locs=par.locs.W)
+  
+  # now, evaluate r0w at the sampled angles
+  r.tau.wstar = apply(wstar,1,function(wstar.i){
+    weightsw<-dmvnorm(w[,-W.dim],mean=as.numeric(wstar.i[-W.dim]),sigma=bww^2*diag(W.dim-1))
+    ccdf<-function(rc){
+      mean(weightsw*pnorm(rc,mean=r,sd=bwr))/mean(weightsw)
+    }
+    dummy<-function(rc){ccdf(rc) - tau}  # want the root of this
+    ur<-uniroot(dummy,interval = c(0,30))
+    return(ur$root)
+  })
+  
+  gfun = function(w,par=par,locs=par.locs){gfun.pwl(x=w,par=par,ref.angles=locs)}
+  
+  sims = lapply(k.vals, function(k){
+    if(k==1){
+      rate <- apply(wstar, 1, gfun, par = par)
+      rstar <- qgamma(1 - runif(nsim) * pgamma(k*r.tau.wstar, shape = shape, 
+                                               rate = rate, lower.tail = F),
+                      shape = shape, rate = rate)
+      return(rstar*wstar)
+    } else if (k>1){
+      iw <- iweights.pwl(k=k,r0w=r.tau.wstar,w=wstar,gfun=gfun,shape=shape,par=par)
+      star.ind <- sample(1:nrow(wstar),size=nsim,replace=T,prob=iw)
+      wstar2 <- wstar[star.ind,]
+      r.tau.wstar2 <- c(k*r.tau.wstar)[star.ind]
+      
+      rate <- apply(wstar2, 1, gfun, par = par)
+      rstar <- qgamma(1 - runif(nsim) * pgamma(r.tau.wstar2, shape = shape, 
+                                               rate = rate, lower.tail = F), 
+                      shape = shape, rate = rate)
+      return(rstar*wstar2)
+    }
+  })
+  return(sims)
+}
+
