@@ -2,6 +2,8 @@
 
 Code associated with <a href="https://arxiv.org/abs/2412.05195" target="_blank">the preprint</a>, by [Ryan Campbell](https://www.ryanstats.com/) and [Jennifer Wadsworth](https://www.lancaster.ac.uk/~wadswojl/#).
 
+**Attention:** This repository is solely for reproducing figures and results in the preprint. Full functionality for fitting piecewise-linear models is embedded in the GitHub repository [geometricMVE](https://github.com/jennywadsworth/geometricMVE).
+
 It is best to first familiarise yourself with the code in example_code/. The remaining scripts are for reproducing the results in the manuscript. 
 
 ## Dependencies
@@ -17,7 +19,7 @@ remotes::install_github("jennywadsworth/geometricMVE")
 install.packages(c("geometry","evd","mvtnorm","rgl","lattice"))
 ```
 
-# source in some useful functions
+# Source in some useful functions
 
 There are some functions requries to reproduce results in the paper, but are not yet available in the geometricMVE package. Mainly functions associated with threshold and limit set projections, described in Section 4.4 of the manuscript. To use these functions, be sure to source the functions in extra-functions.R
 

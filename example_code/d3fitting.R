@@ -46,7 +46,7 @@ r<-apply(x,1,sum)
 w<-x/r
 
 # estimate the threshold
-qr = radial.quants.L1.KDE(r,w,tau=tau,bww=0.05,bwr=0.05,ker="Gaussian")
+qr = fit.thresh(r,w,tau=tau,bww=0.05)
 
 # keep the exceedances
 excind<-r>qr$r0w
@@ -60,16 +60,8 @@ if(length(na.ind)>0){
   r0w<-r0w[-na.ind]}
 
 # plot the KDE threshold
-w.mesh = qr$wpts
-n.mesh = sqrt(nrow(w.mesh))
-r.tau.mat = matrix(qr$r.tau.wpts, nrow=n.mesh, ncol=n.mesh)
-plot3d(x)
-surface3d(x=w.mesh[,1]*r.tau.mat,
-          y=w.mesh[,2]*r.tau.mat,
-          z=w.mesh[,3]*r.tau.mat,
-          col="red",alpha=0.5)
-axes3d(edges="bbox")
-view3d(userMatrix = usermat,zoom=0.8)
+options(rgl.printRglwidget = TRUE)
+plotfittedthresh(qr)
 
 # define the reference angles
 par.locs = seq(0,1,by=1/6)
@@ -96,60 +88,25 @@ for(i in 1:nrow(del.tri$tri)){
 }
 
 # fit the models
-model.fit.R.unbounded   = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE)
-model.fit.R.bounded     = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE)
-model.fit.RW.unbounded  = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fW.fit=T,joint.fit=T)
-model.fit.RW.bounded    = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fW.fit=T,joint.fit=T)
-model.fit.W             = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,pen.const=20,fW.fit=T,method="BFGS")
+model.fit.R.unbounded   = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=F,fixshape = T)
+model.fit.R.unbounded2  = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,fixshape=F)
+model.fit.R.bounded     = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fixshape = T)
+model.fit.R.bounded2     = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,fixshape = F)
+model.fit.RW.unbounded  = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,W.fit=T,joint.fit=T,fixshape = T)
+model.fit.RW.unbounded2  = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=FALSE,W.fit=T,joint.fit=T,fixshape = F)
+model.fit.RW.bounded    = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,W.fit=T,joint.fit=T,fixshape = T)
+model.fit.RW.bounded2    = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=1,method="BFGS",bound.fit=TRUE,W.fit=T,joint.fit=T,fixshape = F)
+model.fit.W             = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,pen.const=20,fW.fit=T,method="BFGS")
 
 # plot the unit level sets
-g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.unbounded$mle,ref.angles=par.locs)
-g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
-open3d()
-plot3d(x/log(n))
-surface3d(w.mesh[,1]/g.vals.mat,
-          w.mesh[,2]/g.vals.mat,
-          w.mesh[,3]/g.vals.mat,
-          col="blue",alpha=0.5)
-axes3d(edges="bbox")
-title3d(xlab="x1",ylab="x2",zlab="x3")
-view3d(userMatrix = usermat,zoom=0.8)
-
-g.vals = gfun.pwl(x=w.mesh,par=model.fit.R.bounded$mle,ref.angles=par.locs)
-g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
-open3d()
-plot3d(x/log(n))
-surface3d(w.mesh[,1]/g.vals.mat,
-          w.mesh[,2]/g.vals.mat,
-          w.mesh[,3]/g.vals.mat,
-          col="blue",alpha=0.5)
-axes3d(edges="bbox")
-title3d(xlab="x1",ylab="x2",zlab="x3")
-view3d(userMatrix = usermat,zoom=0.8)
-
-g.vals = gfun.pwl(x=w.mesh,par=model.fit.RW.unbounded$mle,ref.angles=par.locs)
-g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
-open3d()
-plot3d(x/log(n))
-surface3d(w.mesh[,1]/g.vals.mat,
-          w.mesh[,2]/g.vals.mat,
-          w.mesh[,3]/g.vals.mat,
-          col="blue",alpha=0.5)
-axes3d(edges="bbox")
-title3d(xlab="x1",ylab="x2",zlab="x3")
-view3d(userMatrix = usermat,zoom=0.8)
-
-g.vals = gfun.pwl(x=w.mesh,par=model.fit.RW.bounded$mle,ref.angles=par.locs)
-g.vals.mat =  matrix(g.vals,n.mesh,n.mesh)
-open3d()
-plot3d(x/log(n))
-surface3d(w.mesh[,1]/g.vals.mat,
-          w.mesh[,2]/g.vals.mat,
-          w.mesh[,3]/g.vals.mat,
-          col="blue",alpha=0.5)
-axes3d(edges="bbox")
-title3d(xlab="x1",ylab="x2",zlab="x3")
-view3d(userMatrix = usermat,zoom=0.8)
+plotfittedgauge(model.fit.R.unbounded)
+plotfittedgauge(model.fit.R.unbounded2)
+plotfittedgauge(model.fit.R.bounded)
+plotfittedgauge(model.fit.R.bounded2)
+plotfittedgauge(model.fit.RW.unbounded)
+plotfittedgauge(model.fit.RW.unbounded2)
+plotfittedgauge(model.fit.RW.bounded)
+plotfittedgauge(model.fit.RW.bounded2)
 
 # plot the fitted angular densities on the S_2 simplex
 g.vals.fW = gfun.pwl(x=w.mesh,par=model.fit.W$fW.mle,ref.angles=par.locs)

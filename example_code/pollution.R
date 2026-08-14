@@ -16,8 +16,7 @@ w<-ds.exp.4d/r
 
 tau=0.70
 bww=0.075
-qr=geometricMVE::fit.thresh(r=r,w=w,tau=tau,bww=bww)
-qr2=fit.thresh(r=r,w=w,tau=tau,bww=NULL)  # from extra-functions.R, for adaptive bww
+qr=fit.thresh(r=r,w=w,tau=tau,bww=NULL)  # from extra-functions.R, for adaptive bww
 r0w = qr$r0w
 excind<-r>r0w
 rexc<-r[excind]
@@ -46,13 +45,13 @@ init = init/max(par.locs[,1] * init, na.rm = TRUE)
 init = ifelse(init > 1 / apply(par.locs,1,max), 1/ apply(par.locs,1,max), init)
 
 # fit the radial model
-R.fit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init,
-                  pen.const=1, method="BFGS",bound.fit=TRUE)
+R.fit = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,init.val=init,
+                  fixshape=T,pen.const=1, method="BFGS",bound.fit=TRUE)
 mle = R.fit$mle
 
 # fit the angular model
-W.fit = fit.pwlin(r=rexc,r0w=r0w,w=wexc,locs=par.locs,init.val=init/init[1],
-                  pen.const=20,method="BFGS",fW.fit=TRUE)
+W.fit = fit.geometric.pwl(r=rexc,r0w=r0w,w=wexc,thresh.fit=qr,locs=par.locs,init.val=init/init[1],
+                  pen.const=20,method="BFGS",W.fit=TRUE)
 
 #############################################################################
 
